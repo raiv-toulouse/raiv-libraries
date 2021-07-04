@@ -1,2 +1,2 @@
-# raiv-robot
+# raiv-robots
 Manage Universal Robot
