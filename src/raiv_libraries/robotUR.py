@@ -43,6 +43,29 @@ class RobotUR(object):
         ## surrounding world:
         self.scene = moveit_commander.PlanningSceneInterface()
 
+    def relative_move(self, x, y, z):
+        """
+        Perform a relative move in all x, y or z coordinates.
+
+        :param x:
+        :param y:
+        :param z:
+        :return:
+        """
+        waypoints = []
+        wpose = self.robot.get_current_pose().pose
+        if x:
+            wpose.position.x += x  # First move up (x)
+            waypoints.append(copy.deepcopy(wpose))
+        if y:
+            wpose.position.y += y  # Second move forward/backwards in (y)
+            waypoints.append(copy.deepcopy(wpose))
+        if z:
+            wpose.position.z += z  # Third move sideways (z)
+            waypoints.append(copy.deepcopy(wpose))
+
+        self.robot.exec_cartesian_path(waypoints)
+
     def get_current_pose(self):
         """
 
