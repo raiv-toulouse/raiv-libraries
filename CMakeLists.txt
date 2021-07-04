@@ -28,11 +28,11 @@ catkin_python_setup()
 #)
 
 ## Generate services in the 'srv' folder
-#add_service_files(
-#   FILES
-#   InitDirectory.srv
-#   Grasp.srv
-#)
+add_service_files(
+   FILES
+   InitDirectory.srv
+   Grasp.srv
+)
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
