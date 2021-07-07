@@ -44,14 +44,7 @@ class RobotUR(object):
         self.scene = moveit_commander.PlanningSceneInterface()
 
     def relative_move(self, x, y, z):
-        """
-        Perform a relative move in all x, y or z coordinates.
-
-        :param x:
-        :param y:
-        :param z:
-        :return:
-        """
+        """ Perform a relative move in all x, y or z coordinates. """
         waypoints = []
         wpose = self.robot.get_current_pose().pose
         if x:
@@ -304,11 +297,11 @@ class RobotUR(object):
 if __name__ == '__main__':
     myRobot = RobotUR()
     rospy.init_node('robotUR')
-    print("Press ENTER to continue")
-    input()
+    #print("Press ENTER to continue")
+    #input()
     #myRobot.open_gripper()
-    print("Press ENTER to continue")
-    input()
+    #print("Press ENTER to continue")
+    #input()
     #myRobot.close_gripper()
     # Getting Basic Information
     # ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -329,7 +322,7 @@ if __name__ == '__main__':
     print("============ Press `Enter` to execute a movement using a joint state goal ...")
     input()
     # Test of positioning with angular coordinates
-    targetReached = myRobot.go_to_joint_state([0, -pi / 4, 0, -pi / 2, 0, pi / 3])
+    targetReached = myRobot.go_to_joint_state([0, -pi/2, -pi/2, -pi/2, -pi/2, pi/2])
     if targetReached:
         print("Target reached")
     else:
