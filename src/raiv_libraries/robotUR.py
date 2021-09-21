@@ -1,22 +1,15 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import time
 import copy
 import sys
-import socket
 from math import pi
-from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from tf.transformations import quaternion_from_euler
 import moveit_commander
 import rospy
-import rospkg
 from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
 from moveit_commander.conversions import pose_to_list
-from std_srvs.srv import Trigger, TriggerRequest
 
-# Config
-tcp_robot_ip = "10.31.56.102"
-tcp_port = 30002
 
 # Use this class to drive a Universal Robot with ROS
 # First, run the communication between the robot and ROS :
@@ -25,8 +18,10 @@ tcp_port = 30002
 # Finally, run this node : rosrun raiv_libraries robotUR.py
 
 class RobotUR(object):
-    def __init__(self):
+    def __init__(self,tcp_robot_ip="10.31.56.102",tcp_port = 30002):
         super(RobotUR, self).__init__()
+        self.tcp_robot_ip = tcp_robot_ip
+        self.tcp_port = tcp_port
         # First initialize `moveit_commander`_ and a `rospy`_ node:
         moveit_commander.roscpp_initialize(sys.argv)
         # Instantiate a `RobotCommander`_ object. Provides information such as the robot's
@@ -148,43 +143,6 @@ class RobotUR(object):
         self.move_group.execute(plan, wait=True)
         self.move_group.stop()
 
-    def add_obstacle_box(self,name,size,position):
-        """
-
-        @param name:
-        @param size:
-        @param position:
-        @return:
-        """
-        self.scene.remove_world_object(name)
-        pose = PoseStamped()
-        pose.header.frame_id = "world"
-        pose.pose.position.x = position[0]
-        pose.pose.position.y = position[1]
-        pose.pose.position.z = position[2]
-        self.scene.add_box(name, pose, size=size)
-        return self.wait_for_state_update(name, box_is_known=True)
-
-    def add_obstacle_table(self,name,size,position):
-        """
-
-        @param name:
-        @param size:
-        @param position:
-        @return:
-        """
-        # Create table obstacle
-        self.scene.remove_world_object(name)
-        pose = PoseStamped()
-        pose.header.frame_id = "world"
-        pose.pose.position.x = position[0]
-        pose.pose.position.y = position[1]
-        pose.pose.position.z = position[2]
-        r = rospkg.RosPack()
-        path = r.get_path('ur_icam_description')
-        self.scene.add_mesh(name, pose, path+'/models/cafe_table/meshes/cafe_table.dae')
-        return self.wait_for_state_update(name, box_is_known=True)
-
     def acceleration_factor(self, scaling_value):
         """
 
@@ -259,37 +217,42 @@ class RobotUR(object):
         # If we exited the while loop without returning then we timed out
         return False
 
-    def open_gripper(self):
-        """
-
-        @return:
-        """
-        tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        tcp_socket.connect((tcp_robot_ip, tcp_port))
-        tcp_command = "set_digital_out(8,False)\n"
-        tcp_socket.send(tcp_command)
-        tcp_socket.close()
-        time.sleep(0.5)
-        play_service = rospy.ServiceProxy('/ur_hardware_interface/dashboard/play', Trigger)
-        play = TriggerRequest()
-        play_service(play)
-        time.sleep(0.5)
-
-    def close_gripper(self):
-        """
-
-        @return:
-        """
-        tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        tcp_socket.connect((tcp_robot_ip, tcp_port))
-        tcp_command = "set_digital_out(8,True)\n"
-        tcp_socket.send(tcp_command)
-        tcp_socket.close()
-        time.sleep(0.5)
-        play_service = rospy.ServiceProxy('/ur_hardware_interface/dashboard/play', Trigger)
-        play = TriggerRequest()
-        play_service(play)
-        time.sleep(0.5)
+    # def add_obstacle_box(self,name,size,position):
+    #     """
+    #
+    #     @param name:
+    #     @param size:
+    #     @param position:
+    #     @return:
+    #     """
+    #     self.scene.remove_world_object(name)
+    #     pose = PoseStamped()
+    #     pose.header.frame_id = "world"
+    #     pose.pose.position.x = position[0]
+    #     pose.pose.position.y = position[1]
+    #     pose.pose.position.z = position[2]
+    #     self.scene.add_box(name, pose, size=size)
+    #     return self.wait_for_state_update(name, box_is_known=True)
+    #
+    # def add_obstacle_table(self,name,size,position):
+    #     """
+    #
+    #     @param name:
+    #     @param size:
+    #     @param position:
+    #     @return:
+    #     """
+    #     # Create table obstacle
+    #     self.scene.remove_world_object(name)
+    #     pose = PoseStamped()
+    #     pose.header.frame_id = "world"
+    #     pose.pose.position.x = position[0]
+    #     pose.pose.position.y = position[1]
+    #     pose.pose.position.z = position[2]
+    #     r = rospkg.RosPack()
+    #     path = r.get_path('ur_icam_description')
+    #     self.scene.add_mesh(name, pose, path+'/models/cafe_table/meshes/cafe_table.dae')
+    #     return self.wait_for_state_update(name, box_is_known=True)
 
 #
 #  Test the different RobotUR methods
