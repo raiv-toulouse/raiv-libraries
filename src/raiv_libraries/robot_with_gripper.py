@@ -3,7 +3,9 @@ import time
 import socket
 from std_srvs.srv import Trigger, TriggerRequest
 
-
+"""
+For a UR robot with a RG2 gripper. The gripper is driven throw the digital output #8 (false to open, true to close)
+"""
 class Robot_with_gripper(RobotUR):
     def __init__(self):
         super().__init__()
@@ -19,6 +21,7 @@ class Robot_with_gripper(RobotUR):
         tcp_socket.send(tcp_command)
         tcp_socket.close()
         time.sleep(0.5)
+        # Ask to execute the set_digital_out command
         play_service = rospy.ServiceProxy('/ur_hardware_interface/dashboard/play', Trigger)
         play = TriggerRequest()
         play_service(play)
@@ -35,6 +38,7 @@ class Robot_with_gripper(RobotUR):
         tcp_socket.send(tcp_command)
         tcp_socket.close()
         time.sleep(0.5)
+        # Ask to execute the set_digital_out command
         play_service = rospy.ServiceProxy('/ur_hardware_interface/dashboard/play', Trigger)
         play = TriggerRequest()
         play_service(play)
@@ -47,9 +51,8 @@ if __name__ == '__main__':
     import rospy
     myRobot = Robot_with_gripper()
     rospy.init_node('robot_with_gripper')
-    print("Press ENTER to continue")
-    input()
+    input("Press ENTER to open the gripper")
     myRobot.open_gripper()
-    print("Press ENTER to continue")
-    input()
+    input("Press ENTER to close the gripper")
     myRobot.close_gripper()
+    print("end")
