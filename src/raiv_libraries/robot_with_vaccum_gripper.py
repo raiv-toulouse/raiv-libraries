@@ -23,47 +23,21 @@ class Robot_with_vaccum_gripper(RobotUR):
     def change_environment(self, new_env):
         self.env = new_env
 
-    def relative_move(self, x, y, z):
-        """
-        Perform a relative move in all x, y or z coordinates.
-
-        :param x:
-        :param y:
-        :param z:
-        :return:
-        """
-        waypoints = []
-        wpose = self.get_current_pose().pose
-        if x:
-            wpose.position.x += x  # First move up (x)
-            waypoints.append(copy.deepcopy(wpose))
-        if y:
-            wpose.position.y += y  # Second move forward/backwards in (y)
-            waypoints.append(copy.deepcopy(wpose))
-        if z:
-            wpose.position.z += z  # Third move sideways (z)
-            waypoints.append(copy.deepcopy(wpose))
-
-        self.exec_cartesian_path(waypoints)
-
     def calculate_relative_movement(self, relative_coordinates):
         absolute_coordinates_x = self.env.CARTESIAN_CENTER[0] - relative_coordinates[0]
         absolute_coordinates_y = self.env.CARTESIAN_CENTER[1] - relative_coordinates[1]
-
         current_pose = self.get_current_pose()
-
         x_movement = current_pose.pose.position.x - absolute_coordinates_x
         y_movement = current_pose.pose.position.y - absolute_coordinates_y
-
         return x_movement, y_movement
 
     def calculate_current_coordinates(self):
-        absolut_coordinate_x = self.get_current_pose().pose.position.x
-        absolut_coordinate_y = self.get_current_pose().pose.position.y
-
-        relative_coordinate_x = self.env.CARTESIAN_CENTER[0] - absolut_coordinate_x
-        relative_coordinate_y = self.env.CARTESIAN_CENTER[1] - absolut_coordinate_y
-
+        """" Compute the TCP coordinates relative to the box axis (defined in Environment object)
+        """
+        absolute_coordinate_x = self.get_current_pose().pose.position.x
+        absolute_coordinate_y = self.get_current_pose().pose.position.y
+        relative_coordinate_x = self.env.CARTESIAN_CENTER[0] - absolute_coordinate_x
+        relative_coordinate_y = self.env.CARTESIAN_CENTER[1] - absolute_coordinate_y
         return [relative_coordinate_x, relative_coordinate_y]
 
     # Action north: positive x
@@ -159,16 +133,16 @@ class Robot_with_vaccum_gripper(RobotUR):
             new_plan.joint_trajectory.points = points
             return new_plan
 
-        def back_to_original_pose(robot):
+        def back_to_original_pose():
             """
             Function used to go back to the original height once a vertical movement has been performed.
             :param robot: robot_controller.robot.py object
             :return:
             """
-            distance = self.env.CARTESIAN_CENTER[2] - robot.robot.get_current_pose().pose.position.z
-            robot.relative_move(0, 0, distance)
+            distance = self.env.CARTESIAN_CENTER[2] - self.get_current_pose().pose.position.z
+            self.relative_move(0, 0, distance)
 
-        def down_movement(robot, movement_speed):
+        def down_movement(movement_speed):
             """
             This function performs the down movement of the pick action.
 
@@ -188,17 +162,17 @@ class Robot_with_vaccum_gripper(RobotUR):
 
             if not contact_ok:  # If the robot is already in contact with an object, no movement is performed
                 waypoints = []
-                wpose = robot.robot.get_current_pose().pose
+                wpose = self.get_current_pose().pose
                 wpose.position.z -= (wpose.position.z)  # Third move sideways (z)
                 waypoints.append(copy.deepcopy(wpose))
 
-                (plan, fraction) = robot.robot.move_group.compute_cartesian_path(
+                (plan, fraction) = self.move_group.compute_cartesian_path(
                     waypoints,  # waypoints to follow
                     0.01,  # eef_step
                     0.0)  # jump_threshold
 
                 plan = change_plan_speed(plan, movement_speed)
-                robot.robot.move_group.execute(plan, wait=False)
+                self.move_group.execute(plan, wait=False)
 
                 while not contact_ok:
                     try:
@@ -209,18 +183,18 @@ class Robot_with_vaccum_gripper(RobotUR):
                         break
 
                 # Both stop and 10 mm up movement to stop the robot
-                robot.robot.move_group.stop()
-                robot.relative_move(0, 0, 0.001)
+                self.move_group.stop()
+                self.relative_move(0, 0, 0.001)
 
             return communication_problem
 
         communication_problem = True
         while communication_problem:  # Infinite loop until the movement is completed
-            communication_problem = down_movement(self, movement_speed=0.15)
+            communication_problem = down_movement(movement_speed=0.15)
 
         self.send_gripper_message(True, timer=1)  # We turn on the gripper
 
-        back_to_original_pose(self)  # Back to the original pose
+        back_to_original_pose()  # Back to the original pose
 
         object_gripped = rospy.wait_for_message('object_gripped', Bool).data
         '''
@@ -274,6 +248,9 @@ class Robot_with_vaccum_gripper(RobotUR):
         self.go_to_joint_state(self.env.ANGULAR_CENTER)
 
     def go_to_initial_pose(self):
+        """
+        Go to the center of the box defined by joint coordinates
+        """
         target_reached = self.go_to_joint_state(self.env.ANGULAR_CENTER)
         if target_reached:
             print("Target reachead")
@@ -281,9 +258,38 @@ class Robot_with_vaccum_gripper(RobotUR):
             print("Target not reached")
 
     def go_up_before_changing_box(self):
-        up_point = [-self.get_current_pose().pose.position.x, -self.get_current_pose().pose.position.y, 0.45]
-        target_up = self.go_to_joint_state(up_point)
+        up_point_pose = self.get_current_pose().pose
+        up_point_pose.position.z = 0.45
+        target_up = self.go_to_pose_goal(up_point_pose)
         if target_up:
             print("Target reachead")
         else:
             print("Target not reached")
+
+
+#
+#  Test the different Robot_with_vaccum_gripper methods
+#
+if __name__ == '__main__':
+    from environment import Env_cam_bas
+    import rospy
+
+    rospy.init_node('Robot_with_vaccum_gripper')
+    env = Env_cam_bas()
+    myRobot = Robot_with_vaccum_gripper(env)
+    myRobot.take_north()
+    myRobot.take_south()
+    # Try to take an object
+    myRobot.take_pick()
+    # Release the object
+    myRobot.take_place()
+    # display X,Y coord. relative to the box axis defined by the environment (here a box defined by Env_cam_bas)
+    myRobot.calculate_current_coordinates()
+    myRobot.take_random_state()
+    # Go to the center of the box
+    myRobot.go_to_initial_pose()
+    print("Coordinates of TCP in box axis")
+    print(myRobot.calculate_current_coordinates())
+    # la descente se fait, lors d'un contact, arrêt du robot puis déclnchement de la pompe mais pas de remonté, la méthode s'arrête et affiche False.
+
+
