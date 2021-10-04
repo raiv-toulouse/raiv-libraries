@@ -53,7 +53,6 @@ CONFLICTING_CONTROLLERS = ["joint_group_vel_controller", "twist_controller"]
 class RobotUR(object):
     def __init__(self):
         super(RobotUR, self).__init__()
-        rospy.init_node("test_move")
         timeout = rospy.Duration(5)
         self.switch_srv = rospy.ServiceProxy(
             "controller_manager/switch_controller", SwitchController
@@ -190,8 +189,9 @@ class RobotUR(object):
 #  Test the different RobotUR methods
 #
 if __name__ == '__main__':
-    import time
     myRobot = RobotUR()
+    rospy.init_node("test_robotUR")
+
     input("============ Press `Enter` to go to initial position ...")
     myRobot.go_to_initial_position()
     input("============ Press `Enter` to go to 2 different poses ...")
