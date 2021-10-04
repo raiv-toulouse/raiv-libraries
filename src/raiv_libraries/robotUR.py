@@ -77,8 +77,15 @@ class RobotUR(object):
             geometry_msgs.Vector3(0.3, -0.13, 0.238), geometry_msgs.Quaternion(0, 1, 0, 0)
         )
 
-    def go_to_initial_position(self):
-        self.go_to_pose(self.initial_position)
+    def go_to_initial_position(self, duration=1):
+        self.go_to_pose(self.initial_position, duration)
+
+    def go_to_xyz_position(self, x, y, z, duration=1):
+        """ Go to the x,y,z position with an orientation of Quaternion = (0,1,0,0) (tool frame pointing down) """
+        goal_pose = geometry_msgs.Pose(
+            geometry_msgs.Vector3(x, y, z), geometry_msgs.Quaternion(0, 1, 0, 0)
+        )
+        self.go_to_pose(goal_pose, duration)
 
     def go_to_pose(self, pose, duration=1):
         """
@@ -194,7 +201,9 @@ if __name__ == '__main__':
 
     input("============ Press `Enter` to go to initial position ...")
     myRobot.go_to_initial_position()
-    input("============ Press `Enter` to go to 2 different poses ...")
+    input("============ Press `Enter` to go to a x,y,z  position ...")
+    myRobot.go_to_xyz_position(0.3, 0.2, 0.3)
+    input("============ Press `Enter` to go to 2 different posesche ...")
     myRobot.go_to_pose(geometry_msgs.Pose(
                 geometry_msgs.Vector3(0.4, -0.1, 0.3), geometry_msgs.Quaternion(0, 1, 0, 0)
             ),1)
