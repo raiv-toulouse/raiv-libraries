@@ -21,10 +21,8 @@ from tf2_msgs.msg import TFMessage
 # rosrun raiv_libraries robotUR.py
 
 class RobotUR(object):
-    def __init__(self,tcp_robot_ip="10.31.56.102",tcp_port=30002):
+    def __init__(self):
         super(RobotUR, self).__init__()
-        self.tcp_robot_ip = tcp_robot_ip
-        self.tcp_port = tcp_port
         # First initialize `moveit_commander`_ and a `rospy`_ node:
         moveit_commander.roscpp_initialize(sys.argv)
         # Instantiate a `RobotCommander`_ object. Provides information such as the robot's
@@ -84,7 +82,7 @@ class RobotUR(object):
         """
         moveit_commander.roscpp_shutdown()
 
-    def setPose(self, x, y, z, phi, theta, psi):
+    def setPose(self, x, y, z, phi, theta, psi, end_effector=""):
         """
 
         @param x:
@@ -97,7 +95,7 @@ class RobotUR(object):
         """
         orient = Quaternion(quaternion_from_euler(phi, theta, psi))
         pose = Pose(Point(x, y, z), orient)
-        self.move_group.set_pose_target(pose)
+        self.move_group.set_pose_target(pose, end_effector)
         self.move_group.go(True)
         self.move_group.stop()
 
@@ -116,7 +114,7 @@ class RobotUR(object):
         current_joints = self.move_group.get_current_joint_values()
         return self.all_close(joints_goal, current_joints, 0.01)
 
-    def go_to_pose_goal(self, pose_goal):
+    def go_to_pose_goal(self, pose_goal, end_effector_link=""):
         """
         Planning to a cartesian goal
         @param pose_goal:
