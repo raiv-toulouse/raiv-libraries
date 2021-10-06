@@ -6,6 +6,7 @@ import sys
 from math import pi
 from tf.transformations import quaternion_from_euler
 import moveit_commander
+import threading
 import rospy
 import actionlib
 from rosservice import rosservice_find
@@ -46,7 +47,7 @@ CONFLICTING_CONTROLLERS = ["joint_group_vel_controller", "twist_controller"]
 
 # Use this class to drive a Universal Robot with ROS
 # First, run the communication between the robot and ROS :
-# roslaunch ur_robot_driver ur3_bringup.launch robot_ip:=10.31.56.102 kinematics_config:=${HOME}/Calibration/ur3_calibration.yaml
+# roslaunch raiv_libraries ur3_bringup_cartesian.launch robot_ip:=10.31.56.102 kinematics_config:=${HOME}/Calibration/ur3_calibration.yaml
 # Then, run this node :
 # rosrun raiv_libraries robotUR.py
 
@@ -132,6 +133,21 @@ class RobotUR(object):
         result = self.trajectory_client.get_result()
         rospy.loginfo("Trajectory execution finished in state {}".format(result.error_code))
 
+    def _update_current_pose(self,data):
+        lock = threading.Lock()
+        lock.acquire()
+        try:
+            t = data.transforms[0].transform
+            self.current_pose = geometry_msgs.Pose(
+                geometry_msgs.Vector3(t.translation.x, t.translation.y, t.translation.z),
+                geometry_msgs.Quaternion(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w)
+            )
+            if -0.01 < t.translation.y < 0.01:
+                print('++++++++++++++++++++++++++++++++')
+                print(t)
+        finally:
+            lock.release()
+
     def _switch_controller(self, target_controller):
         """Activates the desired controller and stops all others from the predefined list above"""
         other_controllers = (
@@ -163,13 +179,6 @@ class RobotUR(object):
                 rospy.loginfo("Service call failed ")
         return False
 
-    def _update_current_pose(self,data):
-        t = data.transforms[0].transform
-        self.current_pose = geometry_msgs.Pose(
-            geometry_msgs.Vector3(t.translation.x, t.translation.y, t.translation.z),
-            geometry_msgs.Quaternion(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w)
-        )
-
     def _all_close(self, goal, actual, tolerance):
         """
         Convenience method for testing if a list of values are within a tolerance of their counterparts in another list
@@ -179,7 +188,6 @@ class RobotUR(object):
         @returns: bool
         """
         try:
-            all_equal = True
             if type(goal) is list:
                 for index in range(len(goal)):
                     if abs(actual[index] - goal[index]) > tolerance:
@@ -198,9 +206,8 @@ class RobotUR(object):
 if __name__ == '__main__':
     myRobot = RobotUR()
     rospy.init_node("test_robotUR")
-
     input("============ Press `Enter` to go to initial position ...")
-    myRobot.go_to_initial_position()
+    myRobot.go_to_initial_position(3)
     input("============ Press `Enter` to go to a x,y,z  position ...")
     myRobot.go_to_xyz_position(0.3, 0.2, 0.3)
     input("============ Press `Enter` to go to 2 different posesche ...")
