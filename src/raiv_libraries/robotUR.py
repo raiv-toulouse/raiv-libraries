@@ -142,9 +142,6 @@ class RobotUR(object):
                 geometry_msgs.Vector3(t.translation.x, t.translation.y, t.translation.z),
                 geometry_msgs.Quaternion(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w)
             )
-            if -0.01 < t.translation.y < 0.01:
-                print('++++++++++++++++++++++++++++++++')
-                print(t)
         finally:
             lock.release()
 
