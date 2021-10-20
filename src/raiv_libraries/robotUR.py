@@ -209,7 +209,7 @@ if __name__ == '__main__':
     myRobot.go_to_xyz_position(0.3, 0.2, 0.3)
     input("============ Press `Enter` to go to 2 different posesche ...")
     myRobot.go_to_pose(geometry_msgs.Pose(
-                geometry_msgs.Vector3(0.4, -0.1, 0.3), geometry_msgs.Quaternion(0, 1, 0, 0)
+                geometry_msgs.Vector3(0.4, -0.1, 0.2), geometry_msgs.Quaternion(0, 1, 0, 0)
             ),1)
     myRobot.go_to_pose(geometry_msgs.Pose(
                 geometry_msgs.Vector3(0.3, -0.13, 0.238), geometry_msgs.Quaternion(0, 1, 0, 0)
@@ -221,7 +221,7 @@ if __name__ == '__main__':
             geometry_msgs.Vector3(0.3, -0.13, 0.238), geometry_msgs.Quaternion(0, 1, 0, 0)
         ),
         geometry_msgs.Pose(
-            geometry_msgs.Vector3(0.4, -0.1, 0.3), geometry_msgs.Quaternion(0, 1, 0, 0)
+            geometry_msgs.Vector3(0.4, -0.1, 0.1), geometry_msgs.Quaternion(0, 1, 0, 0)
         ),
         geometry_msgs.Pose(
             geometry_msgs.Vector3(0.4, 0.3, 0.2), geometry_msgs.Quaternion(0, 1, 0, 0)
@@ -236,6 +236,6 @@ if __name__ == '__main__':
     duration_list = [1.0, 3.0, 4.0, 5.0, 6.0]
     myRobot.execute_cartesian_trajectory(pose_list, duration_list)
     input("============ Press `Enter` to execute a relative_move ...")
-    myRobot.relative_move(0.02,0.04,0.06)
+    myRobot.relative_move(0.02, 0.04, 0.06)
     print("The end")
 
