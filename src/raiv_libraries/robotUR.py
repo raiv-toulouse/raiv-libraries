@@ -52,6 +52,10 @@ CONFLICTING_CONTROLLERS = ["joint_group_vel_controller", "twist_controller"]
 # rosrun raiv_libraries robotUR.py
 
 class RobotUR(object):
+    tool_down_pose = geometry_msgs.Quaternion(0., 1., 0., 0.)  # The tool is dow, ready to grasp an object
+    tool_horizontal_pose = geometry_msgs.Quaternion(0.5, 0.5, 0.5, 0.5)  # Pose with the ArUco code up and the tool in horizontal position
+    initial_pose = geometry_msgs.Pose(geometry_msgs.Vector3(0.3, -0.13, 0.238), tool_down_pose) # Define an initial position
+
     def __init__(self):
         super(RobotUR, self).__init__()
         timeout = rospy.Duration(5)
@@ -73,18 +77,14 @@ class RobotUR(object):
         )
         self.current_pose = None
         rospy.Subscriber("tf", TFMessage, self._update_current_pose)
-        # Define an initial position
-        self.initial_position = geometry_msgs.Pose(
-            geometry_msgs.Vector3(0.3, -0.13, 0.238), geometry_msgs.Quaternion(0, 1, 0, 0)
-        )
 
     def go_to_initial_position(self, duration=1):
-        self.go_to_pose(self.initial_position, duration)
+        self.go_to_pose(RobotUR.initial_pose, duration)
 
-    def go_to_xyz_position(self, x, y, z, duration=1):
-        """ Go to the x,y,z position with an orientation of Quaternion = (0,1,0,0) (tool frame pointing down) """
+    def go_to_xyz_position(self, x, y, z, orientation = tool_down_pose, duration=1):
+        """ Go to the x,y,z position with an orientation Quaternion (default : tool frame pointing down) """
         goal_pose = geometry_msgs.Pose(
-            geometry_msgs.Vector3(x, y, z), geometry_msgs.Quaternion(0, 1, 0, 0)
+            geometry_msgs.Vector3(x, y, z), orientation
         )
         self.go_to_pose(goal_pose, duration)
 
@@ -207,30 +207,32 @@ if __name__ == '__main__':
     myRobot.go_to_initial_position(3)
     input("============ Press `Enter` to go to a x,y,z  position ...")
     myRobot.go_to_xyz_position(0.3, 0.2, 0.3)
+    input("============ Press `Enter` to go to a x,y,z  position with the tool oriented horizontaly ...")
+    myRobot.go_to_xyz_position(0.3, 0.2, 0.3, RobotUR.tool_horizontal_pose)
     input("============ Press `Enter` to go to 2 different posesche ...")
     myRobot.go_to_pose(geometry_msgs.Pose(
-                geometry_msgs.Vector3(0.4, -0.1, 0.2), geometry_msgs.Quaternion(0, 1, 0, 0)
+                geometry_msgs.Vector3(0.4, -0.1, 0.2), RobotUR.tool_down_pose
             ),1)
     myRobot.go_to_pose(geometry_msgs.Pose(
-                geometry_msgs.Vector3(0.3, -0.13, 0.238), geometry_msgs.Quaternion(0, 1, 0, 0)
+                geometry_msgs.Vector3(0.3, -0.13, 0.238), RobotUR.tool_down_pose
             ))
     print("Current pose : {}".format(myRobot.get_current_pose()))
     input("============ Press `Enter` to execute a cartesian trajectory ...")
     pose_list = [
         geometry_msgs.Pose(
-            geometry_msgs.Vector3(0.3, -0.13, 0.238), geometry_msgs.Quaternion(0, 1, 0, 0)
+            geometry_msgs.Vector3(0.3, -0.13, 0.238), RobotUR.tool_down_pose
         ),
         geometry_msgs.Pose(
-            geometry_msgs.Vector3(0.4, -0.1, 0.1), geometry_msgs.Quaternion(0, 1, 0, 0)
+            geometry_msgs.Vector3(0.4, -0.1, 0.2), RobotUR.tool_down_pose
         ),
         geometry_msgs.Pose(
-            geometry_msgs.Vector3(0.4, 0.3, 0.2), geometry_msgs.Quaternion(0, 1, 0, 0)
+            geometry_msgs.Vector3(0.4, 0.3, 0.2), RobotUR.tool_down_pose
         ),
         geometry_msgs.Pose(
-            geometry_msgs.Vector3(0.3, 0.3, 0.2), geometry_msgs.Quaternion(0, 1, 0, 0)
+            geometry_msgs.Vector3(0.3, 0.3, 0.2), RobotUR.tool_down_pose
         ),
         geometry_msgs.Pose(
-            geometry_msgs.Vector3(0.3, -0.13, 0.238), geometry_msgs.Quaternion(0, 1, 0, 0)
+            geometry_msgs.Vector3(0.3, -0.13, 0.238), RobotUR.tool_down_pose
         ),
     ]
     duration_list = [1.0, 3.0, 4.0, 5.0, 6.0]
