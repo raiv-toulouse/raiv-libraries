@@ -1,17 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import copy
 import sys
-from math import pi
-from tf.transformations import quaternion_from_euler
-import moveit_commander
-import threading
 import rospy
 import actionlib
 from rosservice import rosservice_find
-from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
-from moveit_commander.conversions import pose_to_list
 from controller_manager_msgs.srv import SwitchControllerRequest, SwitchController, ListControllers
 from controller_manager_msgs.srv import LoadControllerRequest, LoadController
 import geometry_msgs.msg as geometry_msgs
@@ -21,6 +14,7 @@ from cartesian_control_msgs.msg import (
     CartesianTrajectoryPoint,
 )
 from tf2_msgs.msg import TFMessage
+
 
 # All of those controllers can be used to execute joint-based trajectories.
 # The scaled versions should be preferred over the non-scaled versions.
@@ -54,9 +48,9 @@ CONFLICTING_CONTROLLERS = ["joint_group_vel_controller", "twist_controller"]
 class RobotUR(object):
     tool_down_pose = geometry_msgs.Quaternion(0., 1., 0., 0.)  # The tool is dow, ready to grasp an object
     tool_horizontal_pose = geometry_msgs.Quaternion(0.5, 0.5, 0.5, 0.5)  # Pose with the ArUco code up and the tool in horizontal position
-    initial_pose = geometry_msgs.Pose(geometry_msgs.Vector3(0.3, -0.13, 0.238), tool_down_pose) # Define an initial position
+    cartesian_controller = "pose_based_cartesian_traj_controller/follow_cartesian_trajectory"
 
-    def __init__(self):
+    def __init__(self, initial_pose=geometry_msgs.Pose(geometry_msgs.Vector3(0.3, -0.13, 0.238), tool_down_pose)):
         super(RobotUR, self).__init__()
         timeout = rospy.Duration(5)
         self.switch_srv = rospy.ServiceProxy(
@@ -71,18 +65,18 @@ class RobotUR(object):
         if not self._search_for_controller("pose_based_cartesian_traj_controller"):
             self._switch_controller("pose_based_cartesian_traj_controller")
         # make sure the correct controller is loaded and activated
-        self.trajectory_client = actionlib.SimpleActionClient(
-            "{}/follow_cartesian_trajectory".format("pose_based_cartesian_traj_controller"),
-            FollowCartesianTrajectoryAction,
-        )
+        self.trajectory_client = actionlib.SimpleActionClient(RobotUR.cartesian_controller,FollowCartesianTrajectoryAction)
         self.current_pose = None
+        self.initial_pose = initial_pose # Define an initial position
         rospy.Subscriber("tf", TFMessage, self._update_current_pose)
 
     def go_to_initial_position(self, duration=1):
-        self.go_to_pose(RobotUR.initial_pose, duration)
+        self.go_to_pose(self.initial_pose, duration)
 
-    def go_to_xyz_position(self, x, y, z, orientation = tool_down_pose, duration=1):
+    def go_to_xyz_position(self, x, y, z, duration=1, orientation = None):
         """ Go to the x,y,z position with an orientation Quaternion (default : tool frame pointing down) """
+        if orientation is None:
+            orientation = self.initial_pose.orientation
         goal_pose = geometry_msgs.Pose(
             geometry_msgs.Vector3(x, y, z), orientation
         )
@@ -96,10 +90,18 @@ class RobotUR(object):
         """
         point = CartesianTrajectoryPoint()
         point.pose = pose
-        point.time_from_start = rospy.Duration(duration)
-        goal = FollowCartesianTrajectoryGoal()
-        goal.trajectory.points.append(point)
-        self._execute_trajectory(goal)
+        self._go_to_this_point(point, duration)
+
+    def go_to_position(self, position, duration=1):
+        """
+        Send the robot to this cartesian position
+        pose : geometry_msgs.Vector3 (position : x,y,z)
+        duration : # of seconds for the trajectory
+        """
+        point = CartesianTrajectoryPoint()
+        point.pose.position = position
+        point.pose.orientation = self.initial_pose.orientation
+        self._go_to_this_point(point, duration)
 
     def execute_cartesian_trajectory(self, pose_list, duration_list):
         """ Creates a Cartesian trajectory and sends it using the selected action server """
@@ -111,9 +113,11 @@ class RobotUR(object):
             goal.trajectory.points.append(point)
         self._execute_trajectory(goal)
 
-    def relative_move(self, x, y, z):
+    def relative_move(self, x, y, z, orientation = None):
         """ Perform a relative move in all x, y or z coordinates. """
         new_pose = self.get_current_pose()
+        if orientation is None:
+            new_pose.orientation = self.initial_pose.orientation
         new_pose.position.x += x
         new_pose.position.y += y
         new_pose.position.z += z
@@ -123,8 +127,13 @@ class RobotUR(object):
         """ Return the current pose (translation + quaternion), type = geometry_msgs.Pose """
         return self.current_pose
 
-
     ####################### Privates methods #######################
+
+    def _go_to_this_point(self, point, duration = 1):
+        point.time_from_start = rospy.Duration(duration)
+        goal = FollowCartesianTrajectoryGoal()
+        goal.trajectory.points.append(point)
+        self._execute_trajectory(goal)
 
     def _execute_trajectory(self, goal):
         self.trajectory_client.wait_for_server()
@@ -134,16 +143,10 @@ class RobotUR(object):
         rospy.loginfo("Trajectory execution finished in state {}".format(result.error_code))
 
     def _update_current_pose(self,data):
-        lock = threading.Lock()
-        lock.acquire()
-        try:
-            t = data.transforms[0].transform
-            self.current_pose = geometry_msgs.Pose(
-                geometry_msgs.Vector3(t.translation.x, t.translation.y, t.translation.z),
-                geometry_msgs.Quaternion(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w)
-            )
-        finally:
-            lock.release()
+        t = data.transforms[0].transform
+        self.current_pose = geometry_msgs.Pose(
+            geometry_msgs.Vector3(t.translation.x, t.translation.y, t.translation.z),
+            geometry_msgs.Quaternion(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w))
 
     def _switch_controller(self, target_controller):
         """Activates the desired controller and stops all others from the predefined list above"""
@@ -176,31 +179,13 @@ class RobotUR(object):
                 rospy.loginfo("Service call failed ")
         return False
 
-    def _all_close(self, goal, actual, tolerance):
-        """
-        Convenience method for testing if a list of values are within a tolerance of their counterparts in another list
-        @param: goal       A list of floats, a Pose or a PoseStamped
-        @param: actual     A list of floats, a Pose or a PoseStamped
-        @param: tolerance  A float
-        @returns: bool
-        """
-        try:
-            if type(goal) is list:
-                for index in range(len(goal)):
-                    if abs(actual[index] - goal[index]) > tolerance:
-                        return False
-            elif type(goal) is PoseStamped:
-                return self._all_close(goal.pose, actual.pose, tolerance)
-            elif type(goal) is Pose:
-                return self._all_close(pose_to_list(goal), pose_to_list(actual), tolerance)
-            return True
-        except TypeError:
-            rospy.logerr("Incompatible types between goal and actual in 'RobotUR.allClose'")
 
 #
 #  Test the different RobotUR methods
 #
 if __name__ == '__main__':
+    import time
+
     myRobot = RobotUR()
     rospy.init_node("test_robotUR")
     input("============ Press `Enter` to go to initial position ...")
