@@ -43,8 +43,8 @@ class Robot_with_vaccum_gripper(RobotUR):
         communication_problem = True
         while communication_problem:  # Infinite loop until the movement is completed
             communication_problem = self._down_movement(movement_duration=10)
-        object_gripped = rospy.wait_for_message('object_gripped', Bool).data # Wait until a contact between the gripper and an object
         self._back_to_original_z()  # Back to the original z pose (go up)
+        object_gripped = rospy.wait_for_message('object_gripped', Bool).data # Wait until a contact between the gripper and an object
         return object_gripped
 
     # Function to place the grasped object
