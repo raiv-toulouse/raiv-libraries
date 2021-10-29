@@ -12,12 +12,10 @@ Class used to move the robot in all cardinal directions or pick and place an obj
 """
 
 class Robot_with_vaccum_gripper(RobotUR):
-    def __init__(self, gripper_topic='switch_on_off', random_state_strategy='optimal'):
+    def __init__(self, gripper_topic='switch_on_off'):
         super().__init__()
         self.gripper_topic = gripper_topic  # Gripper topic
         self.gripper_publisher = rospy.Publisher(self.gripper_topic, Bool, queue_size=10)  # Publisher for the gripper topic
-        self.environment_image = None
-        self.random_state_strategy = random_state_strategy
 
     # Action north: positive x
     def small_move_to_north(self, distance):
