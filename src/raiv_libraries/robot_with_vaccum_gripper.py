@@ -1,4 +1,5 @@
 import time
+import rospy
 from std_msgs.msg import Bool
 from raiv_libraries.robotUR import RobotUR
 import geometry_msgs.msg as geometry_msgs
@@ -43,8 +44,11 @@ class Robot_with_vaccum_gripper(RobotUR):
         communication_problem = True
         while communication_problem:  # Infinite loop until the movement is completed
             communication_problem = self._down_movement(movement_duration=10)
+        print('début mouvement haut')
         self._back_to_original_z()  # Back to the original z pose (go up)
+        print('fin mouvement haut')
         object_gripped = rospy.wait_for_message('object_gripped', Bool).data # Wait until a contact between the gripper and an object
+        print('pick is ok')
         return object_gripped
 
     # Function to place the grasped object
@@ -78,7 +82,8 @@ class Robot_with_vaccum_gripper(RobotUR):
         Function used to go back to the original height once a vertical movement has been performed.
         """
         pose = self.get_current_pose()
-        pose.position.z = self.initial_pose.position.z
+        pose.position.z = 0.11 #self.initial_pose.position.z
+        print('Z vers lequel on va : ', pose.position.z)
         self.go_to_position(pose.position)
 
     def _down_movement(self, movement_duration):
@@ -116,6 +121,7 @@ class Robot_with_vaccum_gripper(RobotUR):
             # Both stop and 10 mm up movement to stop the robot
             self.trajectory_client.cancel_all_goals()
             self.relative_move(0, 0, 0.001)
+        print('_down_movement is ok')
         return communication_problem
 
 #
