@@ -50,7 +50,7 @@ class RobotUR(object):
     tool_horizontal_pose = geometry_msgs.Quaternion(0.5, 0.5, 0.5, 0.5)  # Pose with the ArUco code up and the tool in horizontal position
     cartesian_controller = "pose_based_cartesian_traj_controller/follow_cartesian_trajectory"
 
-    def __init__(self, initial_pose=geometry_msgs.Pose(geometry_msgs.Vector3(0.3, -0.13, 0.238), tool_down_pose)):
+    def __init__(self, initial_pose=geometry_msgs.Pose(geometry_msgs.Vector3(0.3, -0.13, 0.15), tool_down_pose)):
         super(RobotUR, self).__init__()
         timeout = rospy.Duration(5)
         self.switch_srv = rospy.ServiceProxy(
@@ -73,7 +73,7 @@ class RobotUR(object):
     def go_to_initial_position(self, duration=1):
         self.go_to_pose(self.initial_pose, duration)
 
-    def go_to_xyz_position(self, x, y, z, duration=1, orientation = None):
+    def go_to_xyz_position(self, x, y, z, duration=1.5, orientation = None):
         """ Go to the x,y,z position with an orientation Quaternion (default : tool frame pointing down) """
         if orientation is None:
             orientation = self.initial_pose.orientation
@@ -225,4 +225,3 @@ if __name__ == '__main__':
     input("============ Press `Enter` to execute a relative_move ...")
     myRobot.relative_move(0.02, 0.04, 0.06)
     print("The end")
-
