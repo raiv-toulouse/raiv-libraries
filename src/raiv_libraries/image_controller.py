@@ -5,8 +5,6 @@ import os
 import time
 
 import rospy
-from PIL import Image as PILImage
-from sensor_msgs.msg import Image
 from raiv_libraries.simple_image_controller import SimpleImageController
 
 """
@@ -35,9 +33,7 @@ class ImageController(SimpleImageController):
         image_path = '{}/img{}.png'.format(  # Saving image
             path,  # Path
             time.time())  # FIFO queue
-
         img.save(image_path)
-
         self.ind_saved_images += 1  # Index increment
 
 
