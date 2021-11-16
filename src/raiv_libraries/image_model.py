@@ -14,6 +14,7 @@ from raiv_libraries.CNN import CNN
 from raiv_libraries.image_data_module import ImageDataModule
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
+from pathlib import Path
 
 plt.switch_backend('agg')
 torch.set_printoptions(linewidth=120)
@@ -22,7 +23,6 @@ torch.set_printoptions(linewidth=120)
 class ImageModel:
     def __init__(self,
                  model_name,
-                 data_dir,
                  ckpt_dir,
                  dataset_size=None,
                  batch_size=8,
@@ -40,33 +40,33 @@ class ImageModel:
         # Load model  ################################################
         self.model = CNN(backbone=model_name)
         self.model_name = model_name
-        # self.image_module = MyImageModule(batch_size=self.batch_size, dataset_size=100)
-        self.image_module = ImageDataModule(data_dir, batch_size=self.batch_size, dataset_size=self.dataset_size)
-        # Load images  ################################################
-        self.image_module.setup()
         # For getting the features for the image
         self.activation = {}
         # Save the model after every epoch by monitoring a quantity.
-        self.MODEL_CKPT_PATH = os.path.join(ckpt_dir, f'model/{self.model_name}/')
-        self.MODEL_CKPT = os.path.join(self.MODEL_CKPT_PATH, 'model-{epoch:02d}-{val_loss:.2f}')
-        # Tensorboard Logger used
-        self.logger = TensorBoardLogger('runs', name=f'Model_{self.model_name}')
+#        self.MODEL_CKPT_PATH = os.path.join(ckpt_dir, f'model/{self.model_name}/')
+        self.MODEL_CKPT_PATH = Path(ckpt_dir)
+        self.MODEL_CKPT = self.MODEL_CKPT_PATH / 'model-{epoch:02d}-{val_loss:.2f}'
         # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
         self.fine_tuning = fine_tuning
 
-    def call_trainer(self):
+    def call_trainer(self, data_dir):
+        self.image_module = ImageDataModule(data_dir, batch_size=self.batch_size, dataset_size=self.dataset_size)
+        # Load images  ################################################
+        self.image_module.setup()
         # Samples required by the custom ImagePredictionLogger callback to log image predictions.
         val_samples = next(iter(self.image_module.val_dataloader()))
         grid = self.image_module.inv_trans(torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2))
+        # Tensorboard Logger used
+        logger = TensorBoardLogger('runs', name=f'Model_{self.model_name}')
         # write to tensorboard
-        self.logger.experiment.add_image('test', grid)
-        self.logger.close()
+        logger.experiment.add_image('test', grid)
+        logger.close()
         # Load callbacks ########################################
         checkpoint_callback, early_stop_callback = self._config_callbacks()
         # Trainer  ################################################
         trainer = pl.Trainer(max_epochs=self.num_epochs,
                              gpus=1,
-                             logger=self.logger,
+                             logger=logger,
                              deterministic=True,
                              progress_bar_refresh_rate=0,  # To remove the progress bar
                              #callbacks=[early_stop_callback, checkpoint_callback])
@@ -86,27 +86,13 @@ class ImageModel:
         return feature_size
 
     @torch.no_grad()
-    def evaluate_image(self, image, model, with_processing = True):
+    def evaluate_image(self, image, with_processing=True):
         if with_processing:
-            image_tensor = self.image_preprocessing(image)
+            image_tensor = self._image_preprocessing(image)
         else:
             image_tensor = image
-        features, prediction = model(image_tensor)
+        features, prediction = self.model(image_tensor)
         return features.detach().numpy(), prediction.detach()
-
-
-    def image_preprocessing(self, image):
-        transform = transforms.Compose([
-            # you can add other transformations in this list
-            # transforms.Grayscale(num_output_channels=1),
-            transforms.CenterCrop(size=224),
-            transforms.Resize(size=256),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
-        image_tensor = transform(image).float()
-        image = image_tensor.unsqueeze(0)
-        return image
 
 
     def evaluate_model(self, dataloader = None):
@@ -122,18 +108,20 @@ class ImageModel:
         return y_true, y_pred
 
 
-    def load_model(self, name):
+    def load_ckpt_model_file(self, name):
         """
         Load the model named 'name' from the MODEL_CKPT_PATH folder (ie : model/resnet50)
         :param name: name of the model
         :return: the model freezed to be used for inference
         """
-        self.model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH + name)
+        self.model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH / name)
         self.model.freeze()
         return self.model
 
 
-    def plot_classes_preds(self, images, labels):
+    ##### Private methods #####
+
+    def _plot_classes_preds(self, images, labels):
         '''
         Generates matplotlib Figure using a trained network, along with images
         and labels from a batch, that shows the network's top prediction along
@@ -159,8 +147,18 @@ class ImageModel:
                 color=("green" if preds[idx] == labels[idx].item() else "red"))
         return fig
 
-
-    ##### Private methods #####
+    def _image_preprocessing(self, image):
+        transform = transforms.Compose([
+            # you can add other transformations in this list
+            # transforms.Grayscale(num_output_channels=1),
+            transforms.CenterCrop(size=224),
+            transforms.Resize(size=256),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+        image_tensor = transform(image).float()
+        image = image_tensor.unsqueeze(0)
+        return image
 
     def _config_callbacks(self):
         # Checkpoint  ################################################
@@ -270,8 +268,6 @@ if __name__ == '__main__':
     parser.add_argument('ckpt_folder', type=str, help='folder path where to stock the model.CKPT file generated')
     args = parser.parse_args()
 
-    image_model = ImageModel(model_name='resnet18', data_dir=args.images_folder, ckpt_dir= args.ckpt_folder, num_epochs=20, dataset_size=None)
-
-    image_model.call_trainer()  # Train model
-
+    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, num_epochs=20, dataset_size=None)
+    image_model.call_trainer(data_dir=args.images_folder)  # Train model
     print('End of model training')
