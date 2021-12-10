@@ -4,6 +4,7 @@ import os
 import torch
 import numpy as np
 import re
+import time
 import pytorch_lightning as pl
 import torchvision
 from pytorch_lightning import seed_everything
@@ -66,18 +67,19 @@ class ImageModel:
         # Trainer  ################################################
         trainer = pl.Trainer(max_epochs=self.num_epochs,
                              devices="auto", accelerator="auto",
-
                              auto_select_gpus=False,
                              logger=logger,
-                             deterministic=True,
+                             #deterministic=True,  Fail with bincount non deterministic operation
                              progress_bar_refresh_rate=0,  # To remove the progress bar
                              #callbacks=[early_stop_callback, checkpoint_callback])
-                             callbacks = [checkpoint_callback])
+                             callbacks=[checkpoint_callback])
         # Config Hyperparameters ################################################
         if self.fine_tuning:
             self._tune_model(trainer)
         # Train model ################################################
+        start_fit = time.time()
         trainer.fit(model=self.model, datamodule=self.image_module)
+        print("Training duration = {} s", time.time()-start_fit)
         # Test  ################################################
         trainer.test(datamodule=self.image_module)
 
