@@ -276,7 +276,7 @@ class CNN(pl.LightningModule):
     @staticmethod
     def _loss_function(logits, labels):
 
-        weights = torch.tensor([7.0, 3.0])  #.cuda()
+        weights = torch.tensor([7.0, 3.0]).cuda()
         loss = F.cross_entropy(logits, labels, weight=weights, reduction='mean')
         return loss
 
@@ -297,7 +297,7 @@ class CNN(pl.LightningModule):
         f1_score = f1(preds, y, num_classes=2, average='weighted')
         fb05_score = fbeta(preds, y, num_classes=2, average='weighted', beta=0.5)
         fb2_score = fbeta(preds, y, num_classes=2, average='weighted', beta=2)
-        cm = confusion_matrix(preds, y, num_classes=2)
+        cm = confusion_matrix(preds, y, num_classes=2, )
         prec = precision(preds, y, num_classes=2, average='weighted')
         rec = recall(preds, y, num_classes=2, average='weighted')
         # au_roc = auroc(preds, y, pos_label=1)
