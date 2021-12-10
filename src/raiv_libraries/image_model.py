@@ -65,7 +65,7 @@ class ImageModel:
         checkpoint_callback, early_stop_callback = self._config_callbacks()
         # Trainer  ################################################
         trainer = pl.Trainer(max_epochs=self.num_epochs,
-                             gpus=1,
+                             gpus=0,
                              logger=logger,
                              deterministic=True,
                              progress_bar_refresh_rate=0,  # To remove the progress bar
@@ -163,8 +163,8 @@ class ImageModel:
     def _config_callbacks(self):
         # Checkpoint  ################################################
         # Saves the models so it is possible to access afterwards
-        checkpoint_callback = ModelCheckpoint(dirpath=self.MODEL_CKPT_PATH,
-                                              filename=self.MODEL_CKPT,
+        checkpoint_callback = ModelCheckpoint(dirpath=str(self.MODEL_CKPT_PATH),
+                                              filename=str(self.MODEL_CKPT),
                                               monitor='val_loss',
                                               save_top_k=1,
                                               mode='min',
