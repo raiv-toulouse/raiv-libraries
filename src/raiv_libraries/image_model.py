@@ -65,7 +65,9 @@ class ImageModel:
         checkpoint_callback, early_stop_callback = self._config_callbacks()
         # Trainer  ################################################
         trainer = pl.Trainer(max_epochs=self.num_epochs,
-                             gpus=0,
+                             devices="auto", accelerator="auto",
+
+                             auto_select_gpus=False,
                              logger=logger,
                              deterministic=True,
                              progress_bar_refresh_rate=0,  # To remove the progress bar
