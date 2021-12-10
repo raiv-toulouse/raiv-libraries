@@ -276,7 +276,7 @@ class CNN(pl.LightningModule):
     @staticmethod
     def _loss_function(logits, labels):
 
-        weights = torch.tensor([7.0, 3.0]).cuda()
+        weights = torch.tensor([7.0, 3.0])  #.cuda()
         loss = F.cross_entropy(logits, labels, weight=weights, reduction='mean')
         return loss
 
