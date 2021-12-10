@@ -9,7 +9,7 @@ from typing import Optional
 from torch.optim import lr_scheduler
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.optim.optimizer import Optimizer
-from pytorch_lightning.metrics.functional import accuracy, precision, recall, confusion_matrix, f1, fbeta
+from torchmetrics.functional import accuracy, precision, recall, confusion_matrix, f1, fbeta
 
 BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
 
@@ -298,8 +298,8 @@ class CNN(pl.LightningModule):
         fb05_score = fbeta(preds, y, num_classes=2, average='weighted', beta=0.5)
         fb2_score = fbeta(preds, y, num_classes=2, average='weighted', beta=2)
         cm = confusion_matrix(preds, y, num_classes=2)
-        prec = precision(preds, y, num_classes=2, class_reduction='weighted')
-        rec = recall(preds, y, num_classes=2, class_reduction='weighted')
+        prec = precision(preds, y, num_classes=2, average='weighted')
+        rec = recall(preds, y, num_classes=2, average='weighted')
         # au_roc = auroc(preds, y, pos_label=1)
         return {'loss': loss,
                 'acc': acc,
