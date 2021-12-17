@@ -9,10 +9,10 @@ from raiv_libraries.srv import get_coordservice, get_coordserviceResponse
 import math
 import random
 
-
-class In_box_coord:
+class InBoxCoord:
 
     def __init__(self):
+
         rospy.init_node('In_box_coord')
 
         self.image_rgb = None
@@ -24,64 +24,64 @@ class In_box_coord:
         self.image_width = 640
         self.image_height = 480
 
-        self.Histogram = None
+        self.histogram = None
 
         self.pub = rospy.Publisher('Point_in_box', Image, queue_size=1)
 
-        self.BoxGauche = None
-        self.AngleGauche = 0
+        self.boxgauche = None
+        self.anglegauche = 0
 
-        self.BoxDroite = None
-        self.AngleDroite = 0
+        self.boxdroite = None
+        self.angledroite = 0
 
-        self.BoxActive = None
-        self.AngleActif = None
+        self.boxactive = None
+        self.angleactif = None
 
-        self.BoxInactive = None
-        self.AngleInactif = None
+        self.boxinactive = None
+        self.angleinactif = None
 
         self.r = rospy.Rate(0.3)
 
         self.background_index = 0
 
-        self.crop_height = 60
-        self.crop_width = 60
+        self.crop_height = 30
+        self.crop_width = 30
 
-        self.image_BoxGauche = None
-        self.image_BoxDroite = None
+        self.image_boxgauche = None
+        self.image_boxdroite = None
 
         self.xpick = 0
         self.ypick = 0
-        self.xplace= 563
-        self.yplace= 226
+        self.xplace = 563
+        self.yplace = 226
 
         print('Class Initiated')
 
-        self.RefreshImageAndDistance()
-        self.RemoveBackground()
+        self.refresh_image_and_distance()
+        self.remove_background()
 
         self.distance = rospy.wait_for_message('/Distance_Here', Image)
         self.distance = CvBridge().imgmsg_to_cv2(self.distance, desired_encoding='16UC1')
-        self.Check_Emptyness(self.BoxGauche, self.distance)
 
-        self.RandProcess()
+        self.boxactive = self.boxgauche
+        self.angleactif = self.anglegauche
 
-        service = rospy.Service('/In_box_coordService', get_coordservice, self.ProcessCoord)
+        self.boxinactive = self.boxdroite
+        self.angleinactif = self.angledroite
+
+        self.check_emptyness(self.boxactive, self.distance)
+        service = rospy.Service('/In_box_coordService', get_coordservice, self.process_coord)
         rospy.spin()
 
-    def RandProcess(self):
+    def rand_process(self):
         self.distance = rospy.wait_for_message('/Distance_Here', Image)
         self.distance = CvBridge().imgmsg_to_cv2(self.distance, desired_encoding='16UC1')
-        self.Check_Emptyness(self.BoxGauche, self.distance)
-        print('Emptyness check Done')
-        self.rand_point(self.BoxActive, self.AngleActif)
-        print('Rand_point Done')
-        # self.rand_point(self.BoxInactive, self.AngleInactif)
-        self.Images_crop()
+        self.check_emptyness(self.boxactive, self.distance)
+        self.rand_point(self.boxactive, self.angleactif)
+        self.rand_point(self.boxinactive, self.angleinactif)
+        self.images_crop()
 
-
-
-    def RefreshImageAndDistance(self):
+    def refresh_image_and_distance(self):
 
         self.image_rgb = rospy.wait_for_message('/RGBClean', Image)
 
@@ -91,206 +91,221 @@ class In_box_coord:
 
         self.distance = CvBridge().imgmsg_to_cv2(self.distance, desired_encoding='16UC1')
 
+    def remove_background(self):
 
-    def RemoveBackground(self):
-
-        self.Histogram = cv2.calcHist([self.distance], [0], None, [1000], [1,1000])
-
+        self.histogram = cv2.calcHist([self.distance], [0], None, [1000], [1, 1000])
         np.set_printoptions(threshold=np.inf)
+        self.background_index = self.histogram.argmax()
+        self.distance = np.where(self.distance <= self.background_index-10, self.distance, 0)
+        self.get_contour(self.distance)
 
-        self.background_index = self.Histogram.argmax()
-
-        self.distance = np.where(self.distance <= self.background_index-3, self.distance, 0)
-
-        self.GetContour(self.distance)
-
-
-    def GetContour(self, image):
+    def get_contour(self, image):
 
         image = np.divide(image, np.amax(image))
         image = image * 255
 
-        image = np.array(image, dtype = np.uint8)
+        image = np.array(image, dtype=np.uint8)
 
-        contours, hierarchy = cv2.findContours(image,1,2)
+        contours, hierarchy = cv2.findContours(image, 1, 2)
 
-        imageRGB = cv2.merge((image, image, image))
+        imagergb = cv2.merge((image, image, image))
 
         cntlist = []
 
         for cnt in contours:
-            Box = cv2.minAreaRect(cnt)
-            Box = cv2.boxPoints(Box)
-            Box = np.int0(Box)
-            cv2.drawContours(imageRGB, [Box], 0, (0, 255, 255), 5)
-            cntlist.append((cnt,cv2.contourArea(cnt)))
+            box = cv2.minAreaRect(cnt)
+            box = cv2.boxPoints(box)
+            box = np.int0(box)
+            cv2.drawContours(imagergb, [box], 0, (0, 255, 255), 5)
+            cntlist.append((cnt, cv2.contourArea(cnt)))
 
-        cntlist = sorted(cntlist, key=lambda x:x[1])
+        cntlist = sorted(cntlist, key=lambda x: x[1])
 
-        Box1Contour = cntlist[-1][0]
-        Box2Contour = cntlist[-2][0]
+        box1contour = cntlist[-1][0]
+        box2contour = cntlist[-2][0]
 
-        Box1 = cv2.minAreaRect(Box1Contour)
-        AngleBox1 = Box1[-1]
-        Box2 = cv2.minAreaRect(Box2Contour)
-        AngleBox2 = Box2[-1]
+        box1 = cv2.minAreaRect(box1contour)
+        anglebox1 = box1[-1]
+        box2 = cv2.minAreaRect(box2contour)
+        anglebox2 = box2[-1]
 
-        Box1 = cv2.boxPoints(Box1)
-        Box2 = cv2.boxPoints(Box2)
+        box1 = cv2.boxPoints(box1)
+        box2 = cv2.boxPoints(box2)
 
-        Box1 = np.int0(Box1)
-        Box2 = np.int0(Box2)
+        box1 = np.int0(box1)
+        box2 = np.int0(box2)
 
-        CompteurBox1 = 0
-        CompteurBox2 = 0
+        compteurbox1 = 0
+        compteurbox2 = 0
 
-        for pt in Box1:
-            if pt[0] < self.image_width /2:
-                CompteurBox1 +=1
+        for pt in box1:
+            if pt[0] < self.image_width / 2:
+                compteurbox1 += 1
 
-        for pt in Box2:
-            if pt[0] < self.image_width /2:
-                CompteurBox2 +=1
+        for pt in box2:
+            if pt[0] < self.image_width / 2:
+                compteurbox2 += 1
 
-        if CompteurBox1 > CompteurBox2:
-            self.BoxGauche = Box1
-            self.AngleGauche = AngleBox1
-            self.BoxDroite = Box2
-            self.AngleDroite = AngleBox2
+        if compteurbox1 > compteurbox2:
+            self.boxgauche = box1
+            self.anglegauche = anglebox1
+            self.boxdroite = box2
+            self.angledroite = anglebox2
         else:
-            self.BoxGauche = Box2
-            self.AngleGauche = AngleBox2
-            self.AngleDroite = AngleBox1
-            self.BoxDroite = Box1
+            self.boxgauche = box2
+            self.anglegauche = anglebox2
+            self.angledroite = anglebox1
+            self.boxdroite = box1
 
-        cv2.drawContours(imageRGB, [self.BoxGauche], 0, (0, 0, 255), 3)
-        cv2.drawContours(imageRGB, [self.BoxDroite], 0, (255, 0, 0), 3)
+        cv2.drawContours(imagergb, [self.boxgauche], 0, (0, 0, 255), 3)
+        cv2.drawContours(imagergb, [self.boxdroite], 0, (255, 0, 0), 3)
 
-    def Check_Emptyness(self, Box, image):
-        self.RefreshImageAndDistance()
+    def check_emptyness(self, box, image):
+        self.refresh_image_and_distance()
 
-        mask = np.zeros((self.image_height,self.image_width,1), np.uint8)
+        mask = np.zeros((self.image_height, self.image_width, 1), np.uint8)
 
-        cv2.drawContours(mask,[Box], 0, (1), -1)
+        cv2.drawContours(mask, [box], 0, 1, -1)
 
-        element = cv2.getStructuringElement(0, (2 * 20 + 1, 2 * 20 + 1),(20, 20))
+        element = cv2.getStructuringElement(0, (2 * 20 + 1, 2 * 20 + 1), (20, 20))
         mask = cv2.erode(mask, element)
 
-        image = cv2.bitwise_and(image, image, mask = mask )
+        image = cv2.bitwise_and(image, image, mask=mask)
 
-        Hist = cv2.calcHist([image], [0], mask, [999], [1,1000])
+        hist = cv2.calcHist([image], [0], mask, [999], [1, 1000])
+
         mean = 0
         pool = 1
 
-        for idx, val in enumerate(Hist):
+        dh = 0
+
+        for idx, val in enumerate(hist):
             if int(val) != 0:
                 mean += int(idx)*int(val)
                 pool += val
-        print(pool)
         mean = mean/pool
 
-        self.BoxActive = self.BoxGauche
-        self.AngleActif = self.AngleGauche
+        # Change the value of the height mean depending on which is the active box
 
-        self.BoxInactive = self.BoxDroite
-        self.AngleInactif = self.AngleDroite
+        if self.angleactif is self.anglegauche:
+            dh = 25
 
-        if mean < self.background_index - 20 and Box is self.BoxGauche:
+        elif self.angleactif is self.angledroite:
+            dh = 29
+
+        print('self background index : ', self.background_index)
+        print('self background index - 24 : ', self.background_index - 24)
+        print('mean : ', mean)
+
+        if mean < self.background_index - dh and self.angleactif is self.anglegauche:
             print('La boite gauche est celle active')
-            self.BoxActive = self.BoxGauche
-            self.AngleActif = self.AngleGauche
-            self.BoxInactive = self.BoxDroite
-            self.AngleInactif = self.AngleDroite
+            self.boxactive = self.scale_contour(self.boxgauche, 0.8)
+            self.angleactif = self.anglegauche
+            self.boxinactive = self.scale_contour(self.boxdroite, 0.5)
+            self.angleinactif = self.angledroite
 
-        elif mean < self.background_index - 20 and Box is self.BoxDroite:
+        elif mean < self.background_index - dh and self.angleactif is self.angledroite:
             print('La boite droite est celle active')
-            self.BoxActive = self.BoxDroite
-            self.AngleActif = self.AngleDroite
-            self.BoxInactive = self.BoxGauche
-            self.AngleInactif = self.AngleGauche
+            self.boxactive = self.scale_contour(self.boxdroite, 0.8)
+            self.angleactif = self.angledroite
+            self.boxinactive = self.scale_contour(self.boxgauche, 0.5)
+            self.angleinactif = self.anglegauche
 
-        elif mean >= self.background_index - 20 and Box is self.BoxGauche:
+        elif mean >= self.background_index - dh and self.angleactif is self.anglegauche:
             print('La boite droite est celle active')
-            self.BoxActive = self.BoxDroite
-            self.AngleActif = self.AngleDroite
-            self.BoxInactive = self.BoxGauche
-            self.AngleInactif = self.AngleGauche
+            self.boxactive = self.scale_contour(self.boxdroite, 0.8)
+            self.angleactif = self.angledroite
+            self.boxinactive = self.scale_contour(self.boxgauche, 0.5)
+            self.angleinactif = self.anglegauche
 
-        elif mean >= self.background_index - 20 and Box is self.BoxDroite:
-            print('La boite droite est celle active')
-            self.BoxActive = self.BoxGauche
-            self.AngleActif = self.AngleGauche
-            self.BoxInactive = self.BoxDroite
-            self.AngleInactif = self.AngleDroite
+        elif mean >= self.background_index - dh and self.angleactif is self.angledroite:
+            print('La boite gauche est celle active')
+            self.boxactive = self.scale_contour(self.boxgauche, 0.8)
+            self.angleactif = self.anglegauche
+            self.boxinactive = self.scale_contour(self.boxdroite, 0.5)
+            self.angleinactif = self.angledroite
         else:
-            print('Box inactive : ', self.BoxInactive)
-            print('mean : ', mean)
+            print('box inactive : ', self.boxinactive)
             print('self background -20 : ', self.background_index - 20)
-            print(Box)
-            print(self.BoxGauche)
-            print(self.BoxDroite)
             print('Kleines probleme meine kommandant')
 
-    # def scale_contour(cnt, scale):
-    #     M = cv2.moments(cnt)
-    #     cx = int(M['m10'] / M['m00'])
-    #     cy = int(M['m01'] / M['m00'])
-    #
-    #     cnt_norm = cnt - [cx, cy]
-    #     cnt_scaled = cnt_norm * scale
-    #     cnt_scaled = cnt_scaled + [cx, cy]
-    #     cnt_scaled = cnt_scaled.astype(np.int32)
-    #
-    #     return cnt_scaled
+    @staticmethod
+    def scale_contour(cnt, scale):
+        m = cv2.moments(cnt)
+        cx = int(m['m10'] / m['m00'])
+        cy = int(m['m01'] / m['m00'])
+        cnt_norm = cnt - [cx, cy]
+        cnt_scaled = cnt_norm * scale
+        cnt_scaled = cnt_scaled + [cx, cy]
+        cnt_scaled = cnt_scaled.astype(np.int32)
+        return cnt_scaled
 
     def rand_point(self, box, angle):
+        o_i = int(math.sqrt((box[-1][0]-box[2][0])**2+(box[-1][1]-box[2][1])**2))
+        oi = int(math.sqrt((box[-1][0]-box[0][0])**2+(box[-1][1]-box[0][1])**2))
 
-        O_I = int(math.sqrt((box[-1][0]-box[2][0])**2+(box[-1][1]-box[2][1])**2))
-        OI = int(math.sqrt((box[-1][0]-box[0][0])**2+(box[-1][1]-box[0][1])**2))
-
-        if O_I < OI:
-            Beta = 90-angle
-            PtRef = box[0]
-            Largeur = O_I
-            Longueur = OI
+        if o_i < oi:
+            beta = 90-angle
+            pt_ref = box[0]
+            largeur = o_i
+            longueur = oi
         else:
-            Beta = -angle
-            PtRef = box[1]
-            Largeur = OI
-            Longueur = O_I
+            beta = -angle
+            pt_ref = box[1]
+            largeur = oi
+            longueur = o_i
 
-        x = random.randrange(0, Largeur)
-        y = random.randrange(0, Longueur)
-        print(Beta)
-        x2 = int(y*math.sin(math.pi/180*Beta) + x*math.cos(math.pi/180*Beta))
-        y2 = int(y*math.cos(math.pi/180*Beta) - x*math.sin(math.pi/180*Beta))
+        x = random.randrange(0, largeur)
+        y = random.randrange(0, longueur)
 
-        x2 = x2 + int(PtRef[0])
-        y2 = y2 + int(PtRef[1])
+        x2 = int(y*math.sin(math.pi/180*beta) + x*math.cos(math.pi/180*beta))
+        y2 = int(y*math.cos(math.pi/180*beta) - x*math.sin(math.pi/180*beta))
 
-        if box is self.BoxActive:
+        x2 = x2 + int(pt_ref[0])
+        y2 = y2 + int(pt_ref[1])
+
+        if box is self.boxactive:
             self.xpick = x2
             self.ypick = y2
-        if box is self.BoxInactive:
+        if box is self.boxinactive:
             self.xplace = x2
             self.yplace = y2
 
-    def Images_crop(self):
+        if not self.distance[y2][x2] in range(1, self.background_index-3):
+            print(f'Generating another randpoint due to bad value of depth: {self.distance[y2][x2]}')
+            # image_diag = cv2.merge((self.distance,self.distance,self.distance))
+            # cv2.circle(image_diag,(y2,x2),5,[0,0,255])
+            # cv2.imshow('Distance Invalide', image_diag)
+            # cv2.waitKey(5)
+            self.rand_point(box, angle)
 
-        x = int(self.xpick)
-        y = int(self.ypick)
-        self.rgb_crop = self.image_rgb[int(y - self.crop_width/2):int(y + self.crop_width/2),int(x - self.crop_height/2):int(x + self.crop_height/2)]
-        self.depth_crop = self.distance[int(y - self.crop_width/2):int(y + self.crop_width/2),int(x - self.crop_height/2):int(x + self.crop_height/2)]
+    def images_crop(self, state = 0 ):
 
-    def ProcessCoord(self, req):
-        bridge = CvBridge()
+        if state == 0:
+            x = int(self.xpick)
+            y = int(self.ypick)
+        if state == 1:
+            x = req.x
+            y = req.y
 
+        self.rgb_crop = self.image_rgb[
+                        int(y - self.crop_width/2):int(y + self.crop_width/2),
+                        int(x - self.crop_height/2):int(x + self.crop_height/2)
+                        ]
+        self.depth_crop = self.distance[
+                          int(y - self.crop_width/2):int(y + self.crop_width/2),
+                          int(x - self.crop_height/2):int(x + self.crop_height/2)
+                          ]
+
+        self.depth_crop = np.where(self.depth_crop == 0,self.background_index, self.depth_crop)
+
+    def process_coord(self, req):
 
         self.crop_height = req.height
         self.crop_width = req.width
 
         if req.mode == 'refresh':
-            self.RefreshImageAndDistance()
+            self.refresh_image_and_distance()
             return get_coordserviceResponse(
                 rgb=None,
                 depth=None,
@@ -298,30 +313,50 @@ class In_box_coord:
                 ypick=None,
                 xplace=None,
                 yplace=None,
+                hist_max=None
             )
         if req.mode == 'random':
             bridge = CvBridge()
-            self.RandProcess()
+            self.rand_process()
+            self.rgb_crop = bridge.cv2_to_imgmsg(self.rgb_crop, encoding='passthrough')
 
-            self.rgb_crop = bridge.cv2_to_imgmsg(self.rgb_crop, encoding ='passthrough')
+            self.depth_crop = bridge.cv2_to_imgmsg(self.depth_crop, encoding='passthrough')
 
-            self.depth_crop = bridge.cv2_to_imgmsg(self.depth_crop, encoding ='passthrough')
-
-            # cv2.namedWindow("Supervision Debug", cv2.WINDOW_NORMAL)
-            # cv2.drawContours(self.image_rgb, [self.BoxGauche], 0, (0, 0, 255), 3)
-            # cv2.drawContours(self.image_rgb, [self.BoxDroite], 0, (255, 0, 0), 3)
-            # cv2.circle(self.image_rgb, (self.xpick, self.ypick), 5, (255, 0, 0), -1)
-            # cv2.circle(self.image_rgb, (self.xplace, self.yplace), 5, (0, 0, 255), -1)
-            # cv2.imshow('Supervision Debug', self.image_rgb)
-            # cv2.waitKey(5000)
-            # cv2.destroyWindow('Supervision Debug')
             return get_coordserviceResponse(
-                rgb =self.rgb_crop,
-                depth = self.depth_crop,
-                xpick = self.xpick,
-                ypick = self.ypick,
-                xplace =self.xplace,
-                yplace =self.yplace,
+                rgb=self.rgb_crop,
+                depth=self.depth_crop,
+                xpick=self.xpick,
+                ypick=self.ypick,
+                xplace=self.xplace,
+                yplace=self.yplace,
+                hist_max=self.background_index
             )
 
-IBC = In_box_coord()
+        if req.mode == 'fixed':
+            bridge = CvBridge()
+            self.images_crop(state = 1)
+
+            return get_coordserviceResponse(
+                rgb=self.rgb_crop,
+                depth=self.depth_crop,
+                xpick=None,
+                ypick=None,
+                xplace=None,
+                yplace=None,
+                hist_max=None
+            )
+
+    def affichage(self):
+        bridge = CvBridge()
+        visu = rospy.wait_for_message('/rgbClean', Image)
+        visu = bridge.imgmsg_to_cv2(visu, desired_encoding='bgr8')
+        cv2.drawContours(visu, [self.boxactive], 0, (0, 0, 255), 3)
+        cv2.drawContours(visu, [self.boxinactive], 0, (255, 0, 0), 3)
+        visu = cv2.circle(visu, (self.xpick, self.ypick), 4, (255, 0, 0), -1)
+        visu = cv2.circle(visu, (self.xplace, self.yplace), 4, (0, 0, 255), -1)
+        visu = cv2.circle(visu, (320, 240), 4, (0, 255, 0), -1)
+        cv2.imshow('Supervision', visu)
+        cv2.waitKey(5000)
+
+
+IBC = InBoxCoord()
