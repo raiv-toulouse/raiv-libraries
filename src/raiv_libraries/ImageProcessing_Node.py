@@ -5,7 +5,6 @@ import numpy as np
 from sensor_msgs.msg import Image
 from std_msgs.msg import UInt8
 from cv_bridge import CvBridge
-from Node_Test_Pkg.srv import validationzoneservice, validationzoneserviceResponse
 import argparse
 
 
@@ -19,11 +18,9 @@ class ImageProcessing:
         #Define the publisher
         self.pub = rospy.Publisher('RGBClean', Image, queue_size=1)
 
-        self.srv = rospy.ServiceProxy('ZoneValidationService', validationzoneservice)
         #Define the subscriber
         rospy.Subscriber('/camera/color/image_raw', Image, self.callback)
         self.r = rospy.Rate(30)
-        rospy.wait_for_service('Zone Validation Service')
         rospy.spin()
 
     def callback(self,msg):
@@ -38,20 +35,9 @@ class ImageProcessing:
 
         key = cv2.waitKey(1)
         cv2.imshow('Image RGB', np.array(self.image))
-        cv2.setMouseCallback("Image RGB", self.Click)
 
         #Publishing the frames into the publisher previously defined
         self.pub.publish(msg)
         self.r.sleep()
-
-    def Click(self, event, x, y, flags, param):
-        if event == cv2.EVENT_LBUTTONDOWN:
-            print(x, "et", y)
-            ServResponse = self.srv(x,y)
-            print('Serv Response', ServResponse)
-            if ServResponse.Rep == True:
-                print('CE PIXEL EST DANS LA ZONE VALIDE !')
-            if ServResponse.Rep == False:
-                print("CE PIXEL N'EST PAS DANS LA ZONE VALIDE")                
 
 IP = ImageProcessing()
