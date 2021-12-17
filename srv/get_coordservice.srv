@@ -1,0 +1,13 @@
+string mode
+uint16 width
+uint16 height
+uint16 x
+uint16 y
+---
+sensor_msgs/Image rgb
+sensor_msgs/Image depth
+uint16 xpick
+uint16 ypick
+uint16 xplace
+uint16 yplace
+uint16 hist_max
