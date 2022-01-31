@@ -25,6 +25,7 @@ class SimpleImageController:
 if __name__ == '__main__':
     rospy.init_node('simple_image_controller')  # ROS node initialization
     simple_image_controller = SimpleImageController(image_topic='/usb_cam/image_raw')
+
     while True:
         img, width, height = simple_image_controller.get_image()
         print("image width = {}, height = {}".format(width,height))

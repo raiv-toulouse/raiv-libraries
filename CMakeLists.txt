@@ -33,6 +33,8 @@ add_service_files(
    InitDirectory.srv
    Grasp.srv
    get_coordservice.srv
+   depth_service.srv
+   rgb_service.srv
 )
 
 ## Generate added messages and services with any dependencies listed here
