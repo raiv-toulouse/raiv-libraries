@@ -20,7 +20,7 @@ from tf2_msgs.msg import TFMessage
 # The scaled versions should be preferred over the non-scaled versions.
 JOINT_TRAJECTORY_CONTROLLERS = [
     "scaled_pos_joint_traj_controller",
-    "scaled_vel_joint_traj_controller",
+    "scaled_vel_joint_traj_co ntroller",
     "pos_joint_traj_controller",
     "vel_joint_traj_controller",
     "forward_joint_traj_controller",
@@ -70,10 +70,10 @@ class RobotUR(object):
         self.initial_pose = initial_pose # Define an initial position
         rospy.Subscriber("tf", TFMessage, self._update_current_pose)
 
-    def go_to_initial_position(self, duration=1):
+    def go_to_initial_position(self, duration=2):
         self.go_to_pose(self.initial_pose, duration)
 
-    def go_to_xyz_position(self, x, y, z, duration=1.5, orientation = None):
+    def go_to_xyz_position(self, x, y, z, duration=2, orientation = None):
         """ Go to the x,y,z position with an orientation Quaternion (default : tool frame pointing down) """
         if orientation is None:
             orientation = self.initial_pose.orientation
@@ -82,7 +82,7 @@ class RobotUR(object):
         )
         self.go_to_pose(goal_pose, duration)
 
-    def go_to_pose(self, pose, duration=1):
+    def go_to_pose(self, pose, duration=3):
         """
         Send the robot to this cartesian pose
         pose : geometry_msgs.Pose (position : x,y,z and orientation : quaternion)
@@ -92,7 +92,7 @@ class RobotUR(object):
         point.pose = pose
         self._go_to_this_point(point, duration)
 
-    def go_to_position(self, position, duration=1):
+    def go_to_position(self, position, duration=2):
         """
         Send the robot to this cartesian position
         pose : geometry_msgs.Vector3 (position : x,y,z)
@@ -184,6 +184,7 @@ class RobotUR(object):
 #  Test the different RobotUR methods
 #
 if __name__ == '__main__':
+
     import time
 
     myRobot = RobotUR()

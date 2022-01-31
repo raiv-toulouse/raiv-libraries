@@ -13,6 +13,8 @@ class InBoxCoord:
 
     def __init__(self):
 
+        #Declaration of nodes and global variables
+
         rospy.init_node('In_box_coord')
 
         self.image_rgb = None
@@ -25,20 +27,20 @@ class InBoxCoord:
         self.image_height = 480
 
         self.histogram = None
-
+        self.req = None
         self.pub = rospy.Publisher('Point_in_box', Image, queue_size=1)
 
-        self.boxgauche = None
-        self.anglegauche = 0
+        self.leftbox = None
+        self.angleleft = 0
 
-        self.boxdroite = None
-        self.angledroite = 0
+        self.rightbox = None
+        self.angleright = 0
 
-        self.boxactive = None
-        self.angleactif = None
+        self.activebox = None
+        self.activeangle = None
 
-        self.boxinactive = None
-        self.angleinactif = None
+        self.inactivebox = None
+        self.inactiveangle = None
 
         self.r = rospy.Rate(0.3)
 
@@ -47,15 +49,13 @@ class InBoxCoord:
         self.crop_height = 30
         self.crop_width = 30
 
-        self.image_boxgauche = None
-        self.image_boxdroite = None
+        self.image_leftbox = None
+        self.image_rightbox = None
 
         self.xpick = 0
         self.ypick = 0
         self.xplace = 563
         self.yplace = 226
-
-        print('Class Initiated')
 
         self.refresh_image_and_distance()
         self.remove_background()
@@ -63,24 +63,27 @@ class InBoxCoord:
         self.distance = rospy.wait_for_message('/Distance_Here', Image)
         self.distance = CvBridge().imgmsg_to_cv2(self.distance, desired_encoding='16UC1')
 
-        self.boxactive = self.boxgauche
-        self.angleactif = self.anglegauche
+        self.activebox = self.leftbox
+        self.activeangle = self.angleleft
 
-        self.boxinactive = self.boxdroite
-        self.angleinactif = self.angledroite
+        self.inactivebox = self.rightbox
+        self.inactiveangle = self.angleright
 
-        self.check_emptyness(self.boxactive, self.distance)
+        #As a start, we check if the left box is empty or full, this is mainly used to define all the variables, you should always
+        #start with the left box full and the right one empty
+        self.check_emptyness(self.activebox, self.distance)
         service = rospy.Service('/In_box_coordService', get_coordservice, self.process_coord)
         rospy.spin()
 
     def rand_process(self):
         self.distance = rospy.wait_for_message('/Distance_Here', Image)
         self.distance = CvBridge().imgmsg_to_cv2(self.distance, desired_encoding='16UC1')
-        self.check_emptyness(self.boxactive, self.distance)
-        self.rand_point(self.boxactive, self.angleactif)
-        self.rand_point(self.boxinactive, self.angleinactif)
+        self.check_emptyness(self.activebox, self.distance)
+        self.rand_point(self.activebox, self.activeangle)
+        self.rand_point(self.inactivebox, self.inactiveangle)
         self.images_crop()
 
+    # Function to refresh the RGB and Depth image
     def refresh_image_and_distance(self):
 
         self.image_rgb = rospy.wait_for_message('/RGBClean', Image)
@@ -91,14 +94,16 @@ class InBoxCoord:
 
         self.distance = CvBridge().imgmsg_to_cv2(self.distance, desired_encoding='16UC1')
 
+    #Calculate the histogram of the depth image and take the max value (i.e. the value of the table) every pixel with a value
+    #under the table value +10 milimeters is set to zero. Then we obtain clear contours of the boxes
     def remove_background(self):
 
         self.histogram = cv2.calcHist([self.distance], [0], None, [1000], [1, 1000])
-        np.set_printoptions(threshold=np.inf)
         self.background_index = self.histogram.argmax()
         self.distance = np.where(self.distance <= self.background_index-10, self.distance, 0)
         self.get_contour(self.distance)
 
+    #Function used to get the contours of the two boxes
     def get_contour(self, image):
 
         image = np.divide(image, np.amax(image))
@@ -116,7 +121,7 @@ class InBoxCoord:
             box = cv2.minAreaRect(cnt)
             box = cv2.boxPoints(box)
             box = np.int0(box)
-            cv2.drawContours(imagergb, [box], 0, (0, 255, 255), 5)
+            cv2.drawContours(imagergb, [box], 0, (0, 0, 255), 5)
             cntlist.append((cnt, cv2.contourArea(cnt)))
 
         cntlist = sorted(cntlist, key=lambda x: x[1])
@@ -147,31 +152,32 @@ class InBoxCoord:
                 compteurbox2 += 1
 
         if compteurbox1 > compteurbox2:
-            self.boxgauche = box1
-            self.anglegauche = anglebox1
-            self.boxdroite = box2
-            self.angledroite = anglebox2
+            self.leftbox = box1
+            self.angleleft = anglebox1
+            self.rightbox = box2
+            self.angleright = anglebox2
         else:
-            self.boxgauche = box2
-            self.anglegauche = anglebox2
-            self.angledroite = anglebox1
-            self.boxdroite = box1
+            self.leftbox = box2
+            self.angleleft = anglebox2
+            self.angleright = anglebox1
+            self.rightbox = box1
 
-        cv2.drawContours(imagergb, [self.boxgauche], 0, (0, 0, 255), 3)
-        cv2.drawContours(imagergb, [self.boxdroite], 0, (255, 0, 0), 3)
+        cv2.drawContours(imagergb, [self.leftbox], 0, (0, 0, 255), 3)
+        cv2.drawContours(imagergb, [self.rightbox], 0, (255, 0, 0), 3)
 
+    # Determine if the active box is empty, if so, the active box becomes the inactive one and the inactive box becomes the active one
     def check_emptyness(self, box, image):
         self.refresh_image_and_distance()
 
+        #In this part of the function we calculate the mean height inside the designated box, we then compare this
+        #mean height to value determined empirically to decide if th ebox is still full or empty
         mask = np.zeros((self.image_height, self.image_width, 1), np.uint8)
 
-        cv2.drawContours(mask, [box], 0, 1, -1)
-
+        cv2.drawContours(mask, [box], 0, 255, -1)
         element = cv2.getStructuringElement(0, (2 * 20 + 1, 2 * 20 + 1), (20, 20))
         mask = cv2.erode(mask, element)
 
-        image = cv2.bitwise_and(image, image, mask=mask)
-
+        image = cv2.bitwise_and(image*255, image*255, mask=mask)
         hist = cv2.calcHist([image], [0], mask, [999], [1, 1000])
 
         mean = 0
@@ -185,50 +191,54 @@ class InBoxCoord:
                 pool += val
         mean = mean/pool
 
-        # Change the value of the height mean depending on which is the active box
+        # Change the value of the height mean depending on which is the active box, this is due to the unequal layer of cork in the boxes
 
-        if self.angleactif is self.anglegauche:
+        if self.activeangle is self.angleleft:
             dh = 25
 
-        elif self.angleactif is self.angledroite:
+        elif self.activeangle is self.angleright:
             dh = 29
 
         print('self background index : ', self.background_index)
         print('self background index - 24 : ', self.background_index - 24)
         print('mean : ', mean)
 
-        if mean < self.background_index - dh and self.angleactif is self.anglegauche:
+        #In this part of the function we change global variables depending on the result of our mean height comparaison
+
+        if mean < self.background_index - dh and self.activeangle is self.angleleft:
             print('La boite gauche est celle active')
-            self.boxactive = self.scale_contour(self.boxgauche, 0.8)
-            self.angleactif = self.anglegauche
-            self.boxinactive = self.scale_contour(self.boxdroite, 0.5)
-            self.angleinactif = self.angledroite
+            self.activebox = self.scale_contour(self.leftbox, 0.8)
+            self.activeangle = self.angleleft
+            self.inactivebox = self.scale_contour(self.rightbox, 0.5)
+            self.inactiveangle = self.angleright
 
-        elif mean < self.background_index - dh and self.angleactif is self.angledroite:
+        elif mean < self.background_index - dh and self.activeangle is self.angleright:
             print('La boite droite est celle active')
-            self.boxactive = self.scale_contour(self.boxdroite, 0.8)
-            self.angleactif = self.angledroite
-            self.boxinactive = self.scale_contour(self.boxgauche, 0.5)
-            self.angleinactif = self.anglegauche
+            self.activebox = self.scale_contour(self.rightbox, 0.8)
+            self.activeangle = self.angleright
+            self.inactivebox = self.scale_contour(self.leftbox, 0.5)
+            self.inactiveangle = self.angleleft
 
-        elif mean >= self.background_index - dh and self.angleactif is self.anglegauche:
+        elif mean >= self.background_index - dh and self.activeangle is self.angleleft:
             print('La boite droite est celle active')
-            self.boxactive = self.scale_contour(self.boxdroite, 0.8)
-            self.angleactif = self.angledroite
-            self.boxinactive = self.scale_contour(self.boxgauche, 0.5)
-            self.angleinactif = self.anglegauche
+            self.activebox = self.scale_contour(self.rightbox, 0.8)
+            self.activeangle = self.angleright
+            self.inactivebox = self.scale_contour(self.leftbox, 0.5)
+            self.inactiveangle = self.angleleft
 
-        elif mean >= self.background_index - dh and self.angleactif is self.angledroite:
+        elif mean >= self.background_index - dh and self.activeangle is self.angleright:
             print('La boite gauche est celle active')
-            self.boxactive = self.scale_contour(self.boxgauche, 0.8)
-            self.angleactif = self.anglegauche
-            self.boxinactive = self.scale_contour(self.boxdroite, 0.5)
-            self.angleinactif = self.angledroite
+            self.activebox = self.scale_contour(self.leftbox, 0.8)
+            self.activeangle = self.angleleft
+            self.inactivebox = self.scale_contour(self.rightbox, 0.5)
+            self.inactiveangle = self.angleright
         else:
-            print('box inactive : ', self.boxinactive)
+            print('box inactive : ', self.inactivebox)
             print('self background -20 : ', self.background_index - 20)
             print('Kleines probleme meine kommandant')
 
+    #To downsize the contour size inside the boxes to avoid the suction cup to come in contact too often with the boxes walls
+    #Downsize to 0.8 for the active box and 0.5 for the inactive box
     @staticmethod
     def scale_contour(cnt, scale):
         m = cv2.moments(cnt)
@@ -240,7 +250,10 @@ class InBoxCoord:
         cnt_scaled = cnt_scaled.astype(np.int32)
         return cnt_scaled
 
+    #Generate random point inside the active box contour
     def rand_point(self, box, angle):
+        #This part of the code allows us to know what is the angle we are given by OpenCV
+        #
         o_i = int(math.sqrt((box[-1][0]-box[2][0])**2+(box[-1][1]-box[2][1])**2))
         oi = int(math.sqrt((box[-1][0]-box[0][0])**2+(box[-1][1]-box[0][1])**2))
 
@@ -264,30 +277,24 @@ class InBoxCoord:
         x2 = x2 + int(pt_ref[0])
         y2 = y2 + int(pt_ref[1])
 
-        if box is self.boxactive:
+        if box is self.activebox:
             self.xpick = x2
             self.ypick = y2
-        if box is self.boxinactive:
+        if box is self.inactivebox:
             self.xplace = x2
             self.yplace = y2
 
         if not self.distance[y2][x2] in range(1, self.background_index-3):
             print(f'Generating another randpoint due to bad value of depth: {self.distance[y2][x2]}')
-            # image_diag = cv2.merge((self.distance,self.distance,self.distance))
-            # cv2.circle(image_diag,(y2,x2),5,[0,0,255])
-            # cv2.imshow('Distance Invalide', image_diag)
-            # cv2.waitKey(5)
             self.rand_point(box, angle)
-
-    def images_crop(self, state = 0 ):
-
+    #Crop an image around the selected point
+    def images_crop(self, state=0):
         if state == 0:
             x = int(self.xpick)
             y = int(self.ypick)
         if state == 1:
-            x = req.x
-            y = req.y
-
+            x = self.req.x
+            y = self.req.y
         self.rgb_crop = self.image_rgb[
                         int(y - self.crop_width/2):int(y + self.crop_width/2),
                         int(x - self.crop_height/2):int(x + self.crop_height/2)
@@ -298,14 +305,18 @@ class InBoxCoord:
                           ]
 
         self.depth_crop = np.where(self.depth_crop == 0,self.background_index, self.depth_crop)
+        print(type(self.rgb_crop))
 
+    #Treat the request received by the service
     def process_coord(self, req):
-
+        self.req = req
         self.crop_height = req.height
         self.crop_width = req.width
 
-        if req.mode == 'refresh':
+        #Mode 'refresh', doesn't generate anything, just refresh the RGB and depth image
+        if self.req.mode == 'refresh':
             self.refresh_image_and_distance()
+
             return get_coordserviceResponse(
                 rgb=None,
                 depth=None,
@@ -315,7 +326,8 @@ class InBoxCoord:
                 yplace=None,
                 hist_max=None
             )
-        if req.mode == 'random':
+        #Mode 'Random', used to generate randomly the picking point and the placing point
+        if self.req.mode == 'random':
             bridge = CvBridge()
             self.rand_process()
             self.rgb_crop = bridge.cv2_to_imgmsg(self.rgb_crop, encoding='passthrough')
@@ -331,11 +343,13 @@ class InBoxCoord:
                 yplace=self.yplace,
                 hist_max=self.background_index
             )
-
-        if req.mode == 'fixed':
+        #Mode "fixed", used to generate a crop around a non-random point given in the request
+        if self.req.mode == 'fixed':
             bridge = CvBridge()
+            self.rand_process()
             self.images_crop(state = 1)
-
+            self.rgb_crop = bridge.cv2_to_imgmsg(self.rgb_crop, encoding='passthrough')
+            self.depth_crop = bridge.cv2_to_imgmsg(self.depth_crop, encoding='passthrough')
             return get_coordserviceResponse(
                 rgb=self.rgb_crop,
                 depth=self.depth_crop,
@@ -345,18 +359,5 @@ class InBoxCoord:
                 yplace=None,
                 hist_max=None
             )
-
-    def affichage(self):
-        bridge = CvBridge()
-        visu = rospy.wait_for_message('/rgbClean', Image)
-        visu = bridge.imgmsg_to_cv2(visu, desired_encoding='bgr8')
-        cv2.drawContours(visu, [self.boxactive], 0, (0, 0, 255), 3)
-        cv2.drawContours(visu, [self.boxinactive], 0, (255, 0, 0), 3)
-        visu = cv2.circle(visu, (self.xpick, self.ypick), 4, (255, 0, 0), -1)
-        visu = cv2.circle(visu, (self.xplace, self.yplace), 4, (0, 0, 255), -1)
-        visu = cv2.circle(visu, (320, 240), 4, (0, 255, 0), -1)
-        cv2.imshow('Supervision', visu)
-        cv2.waitKey(5000)
-
 
 IBC = InBoxCoord()
