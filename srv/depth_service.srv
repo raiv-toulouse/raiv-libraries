@@ -1,0 +1,4 @@
+uint8 ksize
+uint8 normalization
+---
+sensor_msgs/Image image
