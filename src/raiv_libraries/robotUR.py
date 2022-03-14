@@ -46,16 +46,14 @@ CONFLICTING_CONTROLLERS = ["joint_group_vel_controller", "twist_controller"]
 # rosrun raiv_libraries robotUR.py
 
 class RobotUR(object):
-    tool_down_pose = geometry_msgs.Quaternion(0., 1., 0., 0.)  # The tool is dow, ready to grasp an object
+    tool_down_pose = geometry_msgs.Quaternion(0., 1., 0., 0.)  # The tool is down, ready to grasp an object
     tool_horizontal_pose = geometry_msgs.Quaternion(0.5, 0.5, 0.5, 0.5)  # Pose with the ArUco code up and the tool in horizontal position
     cartesian_controller = "pose_based_cartesian_traj_controller/follow_cartesian_trajectory"
 
     def __init__(self, initial_pose=geometry_msgs.Pose(geometry_msgs.Vector3(0.3, -0.13, 0.15), tool_down_pose)):
         super(RobotUR, self).__init__()
         timeout = rospy.Duration(5)
-        self.switch_srv = rospy.ServiceProxy(
-            "controller_manager/switch_controller", SwitchController
-        )
+        self.switch_srv = rospy.ServiceProxy("controller_manager/switch_controller", SwitchController)
         self.load_srv = rospy.ServiceProxy("controller_manager/load_controller", LoadController)
         try:
             self.switch_srv.wait_for_service(timeout.to_sec())
@@ -77,9 +75,7 @@ class RobotUR(object):
         """ Go to the x,y,z position with an orientation Quaternion (default : tool frame pointing down) """
         if orientation is None:
             orientation = self.initial_pose.orientation
-        goal_pose = geometry_msgs.Pose(
-            geometry_msgs.Vector3(x, y, z), orientation
-        )
+        goal_pose = geometry_msgs.Pose(geometry_msgs.Vector3(x, y, z), orientation)
         self.go_to_pose(goal_pose, duration)
 
     def go_to_pose(self, pose, duration=3):
@@ -190,11 +186,9 @@ if __name__ == '__main__':
     myRobot = RobotUR()
     rospy.init_node("test_robotUR")
     input("============ Press `Enter` to go to initial position ...")
-    myRobot.go_to_initial_position(3)
+    myRobot.go_to_initial_position(1)
     input("============ Press `Enter` to go to a x,y,z  position ...")
     myRobot.go_to_xyz_position(0.3, 0.2, 0.3)
-    input("============ Press `Enter` to go to a x,y,z  position with the tool oriented horizontaly ...")
-    myRobot.go_to_xyz_position(0.3, 0.2, 0.3, RobotUR.tool_horizontal_pose)
     input("============ Press `Enter` to go to 2 different posesche ...")
     myRobot.go_to_pose(geometry_msgs.Pose(
                 geometry_msgs.Vector3(0.4, -0.1, 0.2), RobotUR.tool_down_pose
