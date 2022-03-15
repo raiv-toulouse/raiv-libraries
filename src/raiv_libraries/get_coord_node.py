@@ -72,7 +72,7 @@ class InBoxCoord:
         #As a start, we check if the left box is empty or full, this is mainly used to define all the variables, you should always
         #start with the left box full and the right one empty
         self.check_emptyness(self.activebox, self.distance)
-        service = rospy.Service('/In_box_coordService', get_coordservice, self.process_coord)
+        self.service = rospy.Service('/In_box_coordService', get_coordservice, self.process_coord)
         rospy.spin()
 
     def rand_process(self):
@@ -162,7 +162,7 @@ class InBoxCoord:
             self.angleright = anglebox1
             self.rightbox = box1
 
-        cv2.drawContours(imagergb, [self.leftbox], 0, (0, 0, 255), 3)
+        cv2.drawContours(imagergb, [self.leftbox], 0, (0, 255, 0), 3)
         cv2.drawContours(imagergb, [self.rightbox], 0, (255, 0, 0), 3)
 
     # Determine if the active box is empty, if so, the active box becomes the inactive one and the inactive box becomes the active one
@@ -177,7 +177,8 @@ class InBoxCoord:
         element = cv2.getStructuringElement(0, (2 * 20 + 1, 2 * 20 + 1), (20, 20))
         mask = cv2.erode(mask, element)
 
-        image = cv2.bitwise_and(image*255, image*255, mask=mask)
+        #image = cv2.bitwise_and(image * 255, image * 255, mask=mask)  GENERATE A BUG
+        image = cv2.bitwise_and(image, image, mask=mask)
         hist = cv2.calcHist([image], [0], mask, [999], [1, 1000])
 
         mean = 0
