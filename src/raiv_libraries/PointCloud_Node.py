@@ -43,12 +43,9 @@ class PointCloud:
 
         #get depth image
         depth_image = bridge.imgmsg_to_cv2(msg, desired_encoding="16UC1")
-        print(depth_image)
 
         #This is used to inverse the black and white colors
         depth_image = 255 - depth_image * 255
-
-        print(depth_image)
 
         depth_image_median = depth_image
         depth_image_median = depth_image_median.astype(np.uint8)
@@ -58,8 +55,6 @@ class PointCloud:
         #The Kernel size can only be an odd number in order to have a center pixel. So if it's even, we add one.
         if (ksize%2) == 0:
             ksize += 1
-
-        print(f'ksize = {ksize}')
 
         #We apply the Median Blur filter to the image
         depth_image_median = cv2.medianBlur(depth_image_median, ksize)
