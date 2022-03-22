@@ -189,7 +189,6 @@ class InBoxCoord:
 
     # Treat the request received by the service
     def process_service(self, req):
-
         # Mode 'refresh', doesn't generate anything, just refresh the RGB and depth images
         if req.mode == 'refresh':
             self.refresh_rgb_and_depth_images()
@@ -210,6 +209,8 @@ class InBoxCoord:
             rgb_crop, depth_crop = self.generate_cropped_images(xpick, ypick, self.image_rgb, self.image_depth, req.width, req.height)
             bridge = CvBridge()
 
+            cv2.imwrite('titi.png',self.image_rgb)
+            #key = cv2.waitKey(10)
             return get_coordserviceResponse(
                 rgb=bridge.cv2_to_imgmsg(rgb_crop, encoding='passthrough'),
                 depth=bridge.cv2_to_imgmsg(depth_crop, encoding='passthrough'),
@@ -219,6 +220,8 @@ class InBoxCoord:
                 yplace=yplace,
                 hist_max=self.distance_camera_to_table
             )
+
+
         #Mode "fixed", used to generate a crop around a non-random point given in the request
         elif req.mode == 'fixed':
             xplace, yplace = self.generate_random_pick_or_place_points(PLACE)
