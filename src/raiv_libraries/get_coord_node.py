@@ -16,6 +16,9 @@ THRESHOLD_ABOVE_TABLE = 10  # Used to select all the pixels above the table
 BOX_ELEVATION = 40  # height in mm above the table for the bottom of a box
 OBJECTS_HEIGHT = 100 # height of the heap of objects in a box
 THRESHOLD_EMPTY_BOX = 50 # A box is empty if the maximum number of pixels < this value
+PICK_BOX_IS_LEFT = 1
+PICK_BOX_IS_RIGHT = 2
+
 
 class InBoxCoord:
 
@@ -63,12 +66,14 @@ class InBoxCoord:
             self.pick_box_angle = self.angleleft
             self.place_box = self.scale_contour(self.rightbox, 0.5)
             self.place_box_angle = self.angleright
+            self.picking_box = PICK_BOX_IS_LEFT
         elif vide_left:
             rospy.loginfo('Right box for picking')
             self.pick_box = self.scale_contour(self.rightbox, 0.8)
             self.pick_box_angle = self.angleright
             self.place_box = self.scale_contour(self.leftbox, 0.5)
             self.place_box_angle = self.angleleft
+            self.picking_box = PICK_BOX_IS_RIGHT
         else:
             rospy.loginfo('Be sure to have one empty box')
 
@@ -285,6 +290,7 @@ class InBoxCoord:
 
         self.refresh_rgb_and_depth_images()
         self.swap_pick_and_place_boxes_if_needed(self.image_depth)
+
         if point_type == PICK:
             return self.generate_random_point_in_box(self.pick_box, self.pick_box_angle)
         else:
@@ -301,23 +307,21 @@ class InBoxCoord:
         vide_right = self.is_box_empty(self.rightbox, image_depth_without_table)
 
         # left -> right and left becomes empty => right is the new picking box
-        if vide_left and self.pick_box is self.leftbox:
+        if vide_left and self.picking_box == PICK_BOX_IS_LEFT:
             rospy.loginfo('Right box for picking')
             self.pick_box = self.scale_contour(self.rightbox, 0.8)
             self.pick_box_angle = self.angleright
             self.place_box = self.scale_contour(self.leftbox, 0.5)
             self.place_box_angle = self.angleleft
-        # left <- right and right becomes empty => left is the new picking box
-        elif vide_right and self.pick_box is self.rightbox:
+            self.picking_box = PICK_BOX_IS_RIGHT
+            # left <- right and right becomes empty => left is the new picking box
+        elif vide_right and self.picking_box == PICK_BOX_IS_RIGHT:
             rospy.loginfo('Left box for picking')
             self.pick_box = self.scale_contour(self.leftbox, 0.8)
             self.pick_box_angle = self.angleleft
             self.place_box = self.scale_contour(self.rightbox, 0.5)
             self.place_box_angle = self.angleright
-        else:
-            rospy.logwarn(f'Pb in swap_pick_and_place_boxes_if_needed ')
-            rospy.logwarn(f'Left box empty ? : {vide_left}')
-            rospy.logwarn(f'Right box empty ? : {vide_right}')
+            self.picking_box = PICK_BOX_IS_LEFT
 
 ###################################################################################################################
 # Main program
