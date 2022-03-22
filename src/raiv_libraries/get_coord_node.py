@@ -63,12 +63,14 @@ class InBoxCoord:
             self.pick_box_angle = self.angleleft
             self.place_box = self.scale_contour(self.rightbox, 0.5)
             self.place_box_angle = self.angleright
-        else:
+        elif vide_left:
             rospy.loginfo('Right box for picking')
             self.pick_box = self.scale_contour(self.rightbox, 0.8)
             self.pick_box_angle = self.angleright
             self.place_box = self.scale_contour(self.leftbox, 0.5)
             self.place_box_angle = self.angleleft
+        else:
+            rospy.loginfo('Be sure to have one empty box')
 
     # Get the contours of the two boxes and init the left and right boxes
     def init_left_and_right_boxes(self, image_depth_without_table):
