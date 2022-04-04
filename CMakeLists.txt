@@ -35,6 +35,7 @@ add_service_files(
    get_coordservice.srv
    depth_service.srv
    rgb_service.srv
+   ObjectGripped.srv
 )
 
 ## Generate added messages and services with any dependencies listed here
