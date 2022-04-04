@@ -48,6 +48,7 @@ CONFLICTING_CONTROLLERS = ["joint_group_vel_controller", "twist_controller"]
 class RobotUR(object):
     tool_down_pose = geometry_msgs.Quaternion(0., 1., 0., 0.)  # The tool is down, ready to grasp an object
     tool_horizontal_pose = geometry_msgs.Quaternion(0.5, 0.5, 0.5, 0.5)  # Pose with the ArUco code up and the tool in horizontal position
+    tool_test_gripped_pose = geometry_msgs.Quaternion(0,0.924,0,0.383)
     cartesian_controller = "pose_based_cartesian_traj_controller/follow_cartesian_trajectory"
 
     def __init__(self, initial_pose=geometry_msgs.Pose(geometry_msgs.Vector3(0.3, -0.13, 0.15), tool_down_pose)):
