@@ -48,7 +48,6 @@ CONFLICTING_CONTROLLERS = ["joint_group_vel_controller", "twist_controller"]
 class RobotUR(object):
     tool_down_pose = geometry_msgs.Quaternion(0., 1., 0., 0.)  # The tool is down, ready to grasp an object
     tool_horizontal_pose = geometry_msgs.Quaternion(0.5, 0.5, 0.5, 0.5)  # Pose with the ArUco code up and the tool in horizontal position
-    tool_test_gripped_pose = geometry_msgs.Quaternion(0,0.924,0,0.383)
     cartesian_controller = "pose_based_cartesian_traj_controller/follow_cartesian_trajectory"
 
     def __init__(self, initial_pose=geometry_msgs.Pose(geometry_msgs.Vector3(0.3, -0.13, 0.15), tool_down_pose)):
@@ -133,6 +132,7 @@ class RobotUR(object):
         self._execute_trajectory(goal)
 
     def _execute_trajectory(self, goal):
+
         self.trajectory_client.wait_for_server()
         self.trajectory_client.send_goal(goal)
         self.trajectory_client.wait_for_result()
@@ -186,16 +186,25 @@ if __name__ == '__main__':
 
     myRobot = RobotUR()
     rospy.init_node("test_robotUR")
-    input("============ Press `Enter` to go to initial position ...")
-    myRobot.go_to_initial_position(1)
-    input("============ Press `Enter` to go to a x,y,z  position ...")
-    myRobot.go_to_xyz_position(0.3, 0.2, 0.3)
+    # input("============ Press `Enter` to go to initial position ...")
+    # myRobot.go_to_initial_position(5)
+    input("============ 1 Press `Enter` to go to a x,y,z  position ...")
+    myRobot.go_to_xyz_position(0.35, 0, 0.12)
+    input("============ HORIZONTAL Press `Enter` to go to a x,y,z  position ...")
+    myRobot.go_to_pose(geometry_msgs.Pose(
+                geometry_msgs.Vector3(0.442, -0.022, 0.125), RobotUR.tool_horizontal_pose
+            ),9)
+    input("============ VERTICAL Press `Enter` to go to a x,y,z  position ...")
+    myRobot.go_to_initial_position(10)
+
+
+
     input("============ Press `Enter` to go to 2 different posesche ...")
     myRobot.go_to_pose(geometry_msgs.Pose(
-                geometry_msgs.Vector3(0.4, -0.1, 0.2), RobotUR.tool_down_pose
+                geometry_msgs.Vector3(0.275, 0, 0.3), RobotUR.tool_horizontal_pose
             ),1)
     myRobot.go_to_pose(geometry_msgs.Pose(
-                geometry_msgs.Vector3(0.3, -0.13, 0.238), RobotUR.tool_down_pose
+                geometry_msgs.Vector3(0.3, -0.13, 0.0238), RobotUR.tool_down_pose
             ))
     print("Current pose : {}".format(myRobot.get_current_pose()))
     input("============ Press `Enter` to execute a cartesian trajectory ...")
