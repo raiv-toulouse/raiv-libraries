@@ -4,6 +4,7 @@ from operator import xor
 from std_msgs.msg import Bool
 from raiv_libraries.robotUR import RobotUR
 import geometry_msgs.msg as geometry_msgs
+from raiv_libraries.srv import ObjectGripped, ObjectGrippedResponse
 from cartesian_control_msgs.msg import (
     FollowCartesianTrajectoryGoal,
     CartesianTrajectoryPoint,
@@ -35,6 +36,16 @@ class Robot_with_vaccum_gripper(RobotUR):
     def small_move_to_west(self, distance):
         self.relative_move(0, distance, 0)
 
+    def check_if_object_gripped(self):
+        rospy.wait_for_service('object_gripped')
+        try:
+            check_object_gripped = rospy.ServiceProxy('object_gripped', ObjectGripped)
+            resp = check_object_gripped()
+            return resp.gripped
+        except rospy.ServiceException as e:
+            print("Service check_if_object_gripped call failed: %s" % e)
+
+
     # Action pick: for pick and place
     def pick(self, pose_for_pick):
         # The robot goes down until the gripper touch something (table or object)
@@ -46,7 +57,7 @@ class Robot_with_vaccum_gripper(RobotUR):
         while communication_problem:  # Infinite loop until the movement is completed
             communication_problem = self._down_movement(movement_duration=10)
         self._back_to_original_z()  # Back to the original z pose (go up)
-        object_gripped = rospy.wait_for_message('object_gripped', Bool).data # Wait until a contact between the gripper and an object
+        object_gripped = self.check_if_object_gripped()
         return object_gripped
 
     # Function to place the grasped object
