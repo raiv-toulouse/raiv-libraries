@@ -68,6 +68,10 @@ class Robot_with_vaccum_gripper(RobotUR):
         # Wait some seconds, in order to the msg to arrive to the gripper
         time.sleep(1)
 
+    def release_gripper(self):
+        self._send_gripper_message(False)
+        time.sleep(1)
+
     ####################### Privates methods #######################
 
     def _send_gripper_message(self, msg, timer=2, n_msg=10):
