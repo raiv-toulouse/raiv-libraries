@@ -18,6 +18,7 @@ OBJECTS_HEIGHT = 100 # height of the heap of objects in a box
 THRESHOLD_EMPTY_BOX = 50 # A box is empty if the maximum number of pixels < this value
 PICK_BOX_IS_LEFT = 1
 PICK_BOX_IS_RIGHT = 2
+DEBUG = False
 
 
 class InBoxCoord:
@@ -35,7 +36,7 @@ class InBoxCoord:
         self.service = rospy.Service('/In_box_coordService', get_coordservice, self.process_service)
 
         self.init_pick_and_place_boxes()
-
+        cv2.namedWindow('debug')
         rospy.spin()
 
     ###################################################################################################################
@@ -131,11 +132,11 @@ class InBoxCoord:
             self.angleright = anglebox1
             self.rightbox = box1
 
-        # DEBUG
-        #key = cv2.waitKey(1)
-        #cv2.drawContours(imagergb, [self.leftbox], 0, (0, 255, 0), 3)
-        #cv2.drawContours(imagergb, [self.rightbox], 0, (255, 0, 0), 3)
-        #cv2.imshow('above table',imagergb)
+        if DEBUG:
+            cv2.drawContours(imagergb, [self.leftbox], 0, (0, 255, 0), 3)
+            cv2.drawContours(imagergb, [self.rightbox], 0, (255, 0, 0), 3)
+            cv2.imshow('debug', imagergb)
+            cv2.waitKey(0)
 
 
     ###################################################################################################################
@@ -163,9 +164,11 @@ class InBoxCoord:
         dist_min = int(self.distance_camera_to_table - BOX_ELEVATION - OBJECTS_HEIGHT)
         dist_max = int(self.distance_camera_to_table - BOX_ELEVATION)
         hist = cv2.calcHist([masked_image], [0], mask, [OBJECTS_HEIGHT], [dist_min, dist_max])
-        # DEBUG
-        #cv2.imshow(titre, masked_image)
-        #print('MAX = ', hist.max())
+
+        if DEBUG:
+            cv2.imshow('debug',  masked_image)
+            cv2.waitKey(0)
+            print('MAX = ', hist.max())
 
         return hist.max() < THRESHOLD_EMPTY_BOX
 
@@ -189,6 +192,10 @@ class InBoxCoord:
 
     # Treat the request received by the service
     def process_service(self, req):
+        if DEBUG:
+            cv2.destroyAllWindows()
+            cv2.namedWindow('debug')
+
         # Mode 'refresh', doesn't generate anything, just refresh the RGB and depth images
         if req.mode == 'refresh':
             self.refresh_rgb_and_depth_images()
@@ -209,8 +216,18 @@ class InBoxCoord:
             rgb_crop, depth_crop = self.generate_cropped_images(xpick, ypick, self.image_rgb, self.image_depth, req.width, req.height)
             bridge = CvBridge()
 
-            cv2.imwrite('titi.png',self.image_rgb)
-            #key = cv2.waitKey(10)
+            if DEBUG:
+                displayed_rgb_crop = rgb_crop
+                cv2.circle(displayed_rgb_crop, (xpick,ypick), radius=2, color=(0, 0, 255), thickness=-1)
+                cv2.circle(displayed_rgb_crop, (xplace,yplace), radius=2, color=(255, 0, 0), thickness=-1)
+                cv2.imshow('debug', displayed_rgb_crop)
+                cv2.waitKey(0)
+                displayed_depth_crop = depth_crop
+                cv2.circle(displayed_depth_crop, (xpick,ypick), radius=2, color=(0, 0, 255), thickness=-1)
+                cv2.circle(displayed_depth_crop, (xplace,yplace), radius=2, color=(255, 0, 0), thickness=-1)
+                cv2.imshow('debug', displayed_depth_crop)
+                cv2.waitKey(0)
+
             return get_coordserviceResponse(
                 rgb=bridge.cv2_to_imgmsg(rgb_crop, encoding='passthrough'),
                 depth=bridge.cv2_to_imgmsg(depth_crop, encoding='passthrough'),
@@ -220,8 +237,6 @@ class InBoxCoord:
                 yplace=yplace,
                 hist_max=self.distance_camera_to_table
             )
-
-
         #Mode "fixed", used to generate a crop around a non-random point given in the request
         elif req.mode == 'fixed':
             xplace, yplace = self.generate_random_pick_or_place_points(PLACE)
