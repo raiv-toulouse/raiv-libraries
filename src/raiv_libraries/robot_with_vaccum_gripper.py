@@ -38,11 +38,12 @@ class Robot_with_vaccum_gripper(RobotUR):
         self.relative_move(0, distance, 0)
 
     def check_if_object_gripped(self):
-        rospy.wait_for_service('object_gripped')
+
+        print('je check si object gripped parle')
         try:
-            check_object_gripped = rospy.ServiceProxy('object_gripped', ObjectGripped)
-            resp = check_object_gripped()
-            return resp.gripped
+            resp = rospy.wait_for_message('object_gripped', Bool)
+            print(resp)
+            return resp.data
         except rospy.ServiceException as e:
             print("Service check_if_object_gripped call failed: %s" % e)
 
@@ -54,11 +55,14 @@ class Robot_with_vaccum_gripper(RobotUR):
         # To be used in recording images for NN training
         self.go_to_pose(pose_for_pick)
         self._send_gripper_message(True, timer=1)   # Vaccum gripper ON
+        print('jai allumé le venturi')
         communication_problem = True
         while communication_problem:  # Infinite loop until the movement is completed
             communication_problem = self._down_movement(movement_duration=10)
         self._back_to_previous_z()  # Back to the original z pose (go up)
         object_gripped = self.check_if_object_gripped()
+        print (object_gripped)
+        print('jai fini fonction pick')
         return object_gripped
 
     # Function to place the grasped object
