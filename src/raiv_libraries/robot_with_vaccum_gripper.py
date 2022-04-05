@@ -17,6 +17,7 @@ Class used to move the robot in all cardinal directions or pick and place an obj
 class Robot_with_vaccum_gripper(RobotUR):
     def __init__(self, gripper_topic='switch_on_off'):
         super().__init__()
+        self.previous_z_position = 0  # Used to memorize the z coordinate when performing a go down then go up movement
         self.gripper_topic = gripper_topic  # Gripper topic
         self.gripper_publisher = rospy.Publisher(self.gripper_topic, Bool, queue_size=10)  # Publisher for the gripper topic
 
@@ -56,7 +57,7 @@ class Robot_with_vaccum_gripper(RobotUR):
         communication_problem = True
         while communication_problem:  # Infinite loop until the movement is completed
             communication_problem = self._down_movement(movement_duration=10)
-        self._back_to_original_z()  # Back to the original z pose (go up)
+        self._back_to_previous_z()  # Back to the original z pose (go up)
         object_gripped = self.check_if_object_gripped()
         return object_gripped
 
@@ -90,12 +91,12 @@ class Robot_with_vaccum_gripper(RobotUR):
             i += 1
         time.sleep(timer/2)
 
-    def _back_to_original_z(self):
+    def _back_to_previous_z(self):
         """
         Function used to go back to the original height once a vertical movement has been performed.
         """
         pose = self.get_current_pose()
-        pose.position.z = 0.11 #self.initial_pose.position.z
+        pose.position.z = self.previous_z_position   #0.11 #self.initial_pose.position.z
         self.go_to_position(pose.position)
 
     def _down_movement(self, movement_duration):
@@ -114,6 +115,7 @@ class Robot_with_vaccum_gripper(RobotUR):
         communication_problem = False
         if not contact_ok:  # If the robot is already in contact with an object, no movement is performed
             wpose = self.get_current_pose()
+            self.previous_z_position = wpose.position.z
             wpose.position.z = 0
             wpose.orientation = self.initial_pose.orientation
             self.trajectory_client.wait_for_server()
