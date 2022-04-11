@@ -257,8 +257,15 @@ class InBoxCoord:
             largeur = oi
             longueur = o_i
 
+        dist_min2 = int(self.distance_camera_to_table - BOX_ELEVATION - 50) # 50 c'est la moitié de la hauteur d'un cylindre
+        point_ok = False
         x = random.randrange(0, largeur)
         y = random.randrange(0, longueur)
+        while not point_ok:
+            x = random.randrange(0, largeur)
+            y = random.randrange(0, longueur)
+            if self.image_depth[x,y] <= dist_min2:
+                point_ok = True
 
         x2 = int(y*math.sin(math.pi/180*beta) + x*math.cos(math.pi/180*beta))
         y2 = int(y*math.cos(math.pi/180*beta) - x*math.sin(math.pi/180*beta))
