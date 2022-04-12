@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 # coding: utf-8
 
@@ -53,8 +54,8 @@ class RobotUR(object):
     def __init__(self, initial_pose=geometry_msgs.Pose(geometry_msgs.Vector3(0.3, -0.13, 0.15), tool_down_pose)):
         super(RobotUR, self).__init__()
         timeout = rospy.Duration(5)
-        self.switch_srv = rospy.ServiceProxy("controller_manager/switch_controller", SwitchController)
-        self.load_srv = rospy.ServiceProxy("controller_manager/load_controller", LoadController)
+        self.switch_srv = rospy.ServiceProxy("/controller_manager/switch_controller", SwitchController)
+        self.load_srv = rospy.ServiceProxy("/controller_manager/load_controller", LoadController)
         try:
             self.switch_srv.wait_for_service(timeout.to_sec())
         except rospy.exceptions.ROSException as err:
@@ -184,8 +185,8 @@ if __name__ == '__main__':
 
     import time
 
-    myRobot = RobotUR()
     rospy.init_node("test_robotUR")
+    myRobot = RobotUR()
     # input("============ Press `Enter` to go to initial position ...")
     # myRobot.go_to_initial_position(5)
     input("============ 1 Press `Enter` to go to a x,y,z  position ...")

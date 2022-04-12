@@ -8,7 +8,6 @@ from cv_bridge import CvBridge
 from raiv_libraries.srv import get_coordservice, get_coordserviceResponse
 import math
 import random
-
 # Used to specify the type of point to generate
 PICK = 1
 PLACE = 2
@@ -19,7 +18,7 @@ THRESHOLD_EMPTY_BOX = 50 # A box is empty if the maximum number of pixels < this
 PICK_BOX_IS_LEFT = 1
 PICK_BOX_IS_RIGHT = 2
 DEBUG = False
-
+PART_HEIGHT = 25  #height of a part in mm
 
 class InBoxCoord:
 
@@ -91,7 +90,7 @@ class InBoxCoord:
             box = cv2.minAreaRect(cnt)
             box = cv2.boxPoints(box)
             box = np.int0(box)
-            cv2.drawContours(imagergb, [box], 0, (0, 0, 255), 5)
+            #cv2.drawContours(imagergb, [box], 0, (0, 0, 255), 5)
             cntlist.append((cnt, cv2.contourArea(cnt)))
 
         cntlist = sorted(cntlist, key=lambda x: x[1])
@@ -132,11 +131,11 @@ class InBoxCoord:
             self.angleright = anglebox1
             self.rightbox = box1
 
-        if DEBUG:
-            cv2.drawContours(imagergb, [self.leftbox], 0, (0, 255, 0), 3)
-            cv2.drawContours(imagergb, [self.rightbox], 0, (255, 0, 0), 3)
-            cv2.imshow('debug', imagergb)
-            cv2.waitKey(0)
+        # if DEBUG:
+        #     cv2.drawContours(imagergb, [self.leftbox], 0, (0, 255, 0), 3)
+        #     cv2.drawContours(imagergb, [self.rightbox], 0, (255, 0, 0), 3)
+        #     cv2.imshow('debug', imagergb)
+        #     cv2.waitKey(0)
 
 
     ###################################################################################################################
@@ -165,10 +164,10 @@ class InBoxCoord:
         dist_max = int(self.distance_camera_to_table - BOX_ELEVATION)
         hist = cv2.calcHist([masked_image], [0], mask, [OBJECTS_HEIGHT], [dist_min, dist_max])
 
-        if DEBUG:
-            cv2.imshow('debug',  masked_image)
-            cv2.waitKey(0)
-            print('MAX = ', hist.max())
+        # if DEBUG:
+        #     cv2.imshow('debug',  masked_image)
+        #     cv2.waitKey(0)
+        #     print('MAX = ', hist.max())
 
         return hist.max() < THRESHOLD_EMPTY_BOX
 
@@ -192,9 +191,9 @@ class InBoxCoord:
 
     # Treat the request received by the service
     def process_service(self, req):
-        if DEBUG:
-            cv2.destroyAllWindows()
-            cv2.namedWindow('debug')
+        # if DEBUG:
+        #     cv2.destroyAllWindows()
+        #     cv2.namedWindow('debug')
 
         # Mode 'refresh', doesn't generate anything, just refresh the RGB and depth images
         if req.mode == 'refresh':
@@ -222,11 +221,11 @@ class InBoxCoord:
                 cv2.circle(displayed_rgb_crop, (xplace,yplace), radius=2, color=(255, 0, 0), thickness=-1)
                 cv2.imshow('debug', displayed_rgb_crop)
                 cv2.waitKey(0)
-                displayed_depth_crop = depth_crop
-                cv2.circle(displayed_depth_crop, (xpick,ypick), radius=2, color=(0, 0, 255), thickness=-1)
-                cv2.circle(displayed_depth_crop, (xplace,yplace), radius=2, color=(255, 0, 0), thickness=-1)
-                cv2.imshow('debug', displayed_depth_crop)
-                cv2.waitKey(0)
+                # displayed_depth_crop = depth_crop
+                # cv2.circle(displayed_depth_crop, (xpick,ypick), radius=2, color=(0, 0, 255), thickness=-1)
+                # cv2.circle(displayed_depth_crop, (xplace,yplace), radius=2, color=(255, 0, 0), thickness=-1)
+                # cv2.imshow('debug', displayed_depth_crop)
+                # cv2.waitKey(0)
 
             return get_coordserviceResponse(
                 rgb=bridge.cv2_to_imgmsg(rgb_crop, encoding='passthrough'),
@@ -255,12 +254,10 @@ class InBoxCoord:
 
 
     #Generate random point inside the box contour
-    def generate_random_point_in_box(self, box, angle):
-
+    def generate_random_point_in_box(self, box, angle, point_type):
         #This part of the code allows us to know what is the angle we are given by OpenCV
         o_i = int(math.sqrt((box[-1][0]-box[2][0])**2+(box[-1][1]-box[2][1])**2))
         oi = int(math.sqrt((box[-1][0]-box[0][0])**2+(box[-1][1]-box[0][1])**2))
-
         if o_i < oi:
             beta = 90-angle
             pt_ref = box[0]
@@ -272,25 +269,28 @@ class InBoxCoord:
             largeur = oi
             longueur = o_i
 
-        dist_min2 = int(self.distance_camera_to_table - BOX_ELEVATION - 50) # 50 c'est la moitié de la hauteur d'un cylindre
+        dist_min2 = int(self.distance_camera_to_table - BOX_ELEVATION - PART_HEIGHT/2) # distance camera to the bottom box
+
         point_ok = False
-        x = random.randrange(0, largeur)
-        y = random.randrange(0, longueur)
         while not point_ok:
             x = random.randrange(0, largeur)
             y = random.randrange(0, longueur)
-            if self.image_depth[x,y] <= dist_min2:
+            x2 = int(y * math.sin(math.pi / 180 * beta) + x * math.cos(math.pi / 180 * beta))
+            y2 = int(y * math.cos(math.pi / 180 * beta) - x * math.sin(math.pi / 180 * beta))
+            print('x2 et y2 avant',x2,y2)
+            x2 = x2 + int(pt_ref[0])
+            y2 = y2 + int(pt_ref[1])
+            print('x2 y2 après',x2, y2)
+            print('profondeur du pixel----------------------', self.image_depth[y2][x2])
+            if point_type == PLACE:
                 point_ok = True
+            elif 450 < self.image_depth[y2][x2] < 480:  # PICK case
+                    point_ok = True
 
-        x2 = int(y*math.sin(math.pi/180*beta) + x*math.cos(math.pi/180*beta))
-        y2 = int(y*math.cos(math.pi/180*beta) - x*math.sin(math.pi/180*beta))
-
-        x2 = x2 + int(pt_ref[0])
-        y2 = y2 + int(pt_ref[1])
 
         if not self.image_depth[y2][x2] in range(1, self.distance_camera_to_table - 3):
             rospy.loginfo(f'Generating another randpoint due to bad value of depth: {self.image_depth[y2][x2]}')
-            return self.generate_random_point_in_box(box, angle)
+            return self.generate_random_point_in_box(box, angle, point_type)
 
         return x2, y2
 
@@ -317,9 +317,9 @@ class InBoxCoord:
         self.swap_pick_and_place_boxes_if_needed(self.image_depth)
 
         if point_type == PICK:
-            return self.generate_random_point_in_box(self.pick_box, self.pick_box_angle)
+            return self.generate_random_point_in_box(self.pick_box, self.pick_box_angle, point_type)
         else:
-            return self.generate_random_point_in_box(self.place_box, self.place_box_angle)
+            return self.generate_random_point_in_box(self.place_box, self.place_box_angle, point_type)
 
 
     # Determine if the pick box is empty, if so, the pick box becomes the place one and the place box becomes the pick one
