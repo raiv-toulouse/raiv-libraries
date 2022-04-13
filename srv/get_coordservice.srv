@@ -1,13 +1,15 @@
-string mode
-uint16 width
-uint16 height
-uint16 x
+string mode # 'random' or 'fixed'
+uint8 type_of_point # 1 for pick, 2 for place
+bool on_object # True if we want a point ON an object
+uint16 crop_width
+uint16 crop_height
+uint16 x # In case of 'fixed', the (x,y) pixel coordinates
 uint16 y
 ---
-sensor_msgs/Image rgb
-sensor_msgs/Image depth
-uint16 xpick
-uint16 ypick
-uint16 xplace
-uint16 yplace
-uint16 hist_max
+sensor_msgs/Image rgb_crop
+sensor_msgs/Image depth_crop
+uint16 x_pixel # Coordinates in image frame (pixel)
+uint16 y_pixel
+uint16 x_robot # Coordinates in robot frame (meter)
+uint16 y_robot
+uint16 z_robot
