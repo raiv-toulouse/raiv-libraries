@@ -16,7 +16,6 @@ OBJECTS_HEIGHT = 100 # height of the heap of objects in a box
 THRESHOLD_EMPTY_BOX = 50 # A box is empty if the maximum number of pixels < this value
 PICK_BOX_IS_LEFT = 1
 PICK_BOX_IS_RIGHT = 2
-DEBUG = False
 PART_HEIGHT = 25  #height of a part in mm
 
 class InBoxCoord:
