@@ -314,5 +314,5 @@ class InBoxCoord:
 ###################################################################################################################
 
 if __name__ == '__main__':
-    pc = PerspectiveCalibration()
+    pc = PerspectiveCalibration('common/calibration/camera/camera_data')
     IBC = InBoxCoord(pc)
