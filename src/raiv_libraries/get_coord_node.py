@@ -28,7 +28,6 @@ class InBoxCoord:
 
     def __init__(self, perspective_calibration):
 
-        rospy.init_node('In_box_coord')
         self.perspective_calibration = perspective_calibration
         self.image_rgb = None
         self.image_depth = None
@@ -197,8 +196,9 @@ class InBoxCoord:
             x_pixel, y_pixel = req.x, req.y
 
         x, y, z = self.perspective_calibration.from_2d_to_3d([x_pixel, y_pixel])
+        print(x, y, z)
         if req.type_of_point == InBoxCoord.PICK:
-            rgb_crop, depth_crop = self.generate_cropped_images(x_pixel, y_pixel, self.image_rgb, self.image_depth, req.width, req.height)
+            rgb_crop, depth_crop = self.generate_cropped_images(x_pixel, y_pixel, self.image_rgb, self.image_depth, req.crop_width, req.crop_height)
             bridge = CvBridge()
             rgb_crop = bridge.cv2_to_imgmsg(rgb_crop, encoding='passthrough')
             depth_crop = bridge.cv2_to_imgmsg(depth_crop, encoding='passthrough')
@@ -313,5 +313,6 @@ class InBoxCoord:
 ###################################################################################################################
 
 if __name__ == '__main__':
+    rospy.init_node('In_box_coord')
     pc = PerspectiveCalibration('/common/calibration/camera/camera_data')
     IBC = InBoxCoord(pc)
