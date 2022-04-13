@@ -6,11 +6,10 @@ import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from raiv_libraries.srv import get_coordservice, get_coordserviceResponse
+from raiv_camera_calibration.perspective_calibration import PerspectiveCalibration
 import math
 import random
-# Used to specify the type of point to generate
-PICK = 1
-PLACE = 2
+
 THRESHOLD_ABOVE_TABLE = 10  # Used to select all the pixels above the table
 BOX_ELEVATION = 40  # height in mm above the table for the bottom of a box
 OBJECTS_HEIGHT = 100 # height of the heap of objects in a box
@@ -21,21 +20,19 @@ DEBUG = False
 PART_HEIGHT = 25  #height of a part in mm
 
 class InBoxCoord:
+    # Used to specify the type of point to generate
+    PICK = 1
+    PLACE = 2
 
-    def __init__(self):
+    def __init__(self, perspective_calibration):
 
         rospy.init_node('In_box_coord')
-
+        self.perspective_calibration = perspective_calibration
         self.image_rgb = None
         self.image_depth = None
         self.distance_camera_to_table = 0
-
-        self.pub = rospy.Publisher('Point_in_box', Image, queue_size=1)
-        rospy.Rate(0.3)
         self.service = rospy.Service('/In_box_coordService', get_coordservice, self.process_service)
-
         self.init_pick_and_place_boxes()
-        cv2.namedWindow('debug')
         rospy.spin()
 
     ###################################################################################################################
@@ -191,66 +188,25 @@ class InBoxCoord:
 
     # Treat the request received by the service
     def process_service(self, req):
-        # if DEBUG:
-        #     cv2.destroyAllWindows()
-        #     cv2.namedWindow('debug')
 
-        # Mode 'refresh', doesn't generate anything, just refresh the RGB and depth images
-        if req.mode == 'refresh':
-            self.refresh_rgb_and_depth_images()
-
-            return get_coordserviceResponse(
-                rgb=None,
-                depth=None,
-                xpick=None,
-                ypick=None,
-                xplace=None,
-                yplace=None,
-                hist_max=None
-            )
-        #Mode 'Random', used to generate randomly the picking point and the placing point
-        elif req.mode == 'random':
-            xpick, ypick = self.generate_random_pick_or_place_points(PICK)
-            xplace, yplace = self.generate_random_pick_or_place_points(PLACE)
-            rgb_crop, depth_crop = self.generate_cropped_images(xpick, ypick, self.image_rgb, self.image_depth, req.width, req.height)
-            bridge = CvBridge()
-
-            if DEBUG:
-                displayed_rgb_crop = rgb_crop
-                cv2.circle(displayed_rgb_crop, (xpick,ypick), radius=2, color=(0, 0, 255), thickness=-1)
-                cv2.circle(displayed_rgb_crop, (xplace,yplace), radius=2, color=(255, 0, 0), thickness=-1)
-                cv2.imshow('debug', displayed_rgb_crop)
-                cv2.waitKey(0)
-                # displayed_depth_crop = depth_crop
-                # cv2.circle(displayed_depth_crop, (xpick,ypick), radius=2, color=(0, 0, 255), thickness=-1)
-                # cv2.circle(displayed_depth_crop, (xplace,yplace), radius=2, color=(255, 0, 0), thickness=-1)
-                # cv2.imshow('debug', displayed_depth_crop)
-                # cv2.waitKey(0)
-
-            return get_coordserviceResponse(
-                rgb=bridge.cv2_to_imgmsg(rgb_crop, encoding='passthrough'),
-                depth=bridge.cv2_to_imgmsg(depth_crop, encoding='passthrough'),
-                xpick=xpick,
-                ypick=ypick,
-                xplace=xplace,
-                yplace=yplace,
-                hist_max=self.distance_camera_to_table
-            )
-        #Mode "fixed", used to generate a crop around a non-random point given in the request
+        if req.mode == 'random':
+            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point)
         elif req.mode == 'fixed':
-            xplace, yplace = self.generate_random_pick_or_place_points(PLACE)
-            rgb_crop, depth_crop = self.generate_cropped_images(req.x, req.y, self.image_rgb, self.image_depth, req.width, req.height)
-            bridge = CvBridge()
+            x_pixel, y_pixel = req.x, req.y
 
-            return get_coordserviceResponse(
-                rgb=bridge.cv2_to_imgmsg(rgb_crop, encoding='passthrough'),
-                depth=bridge.cv2_to_imgmsg(depth_crop, encoding='passthrough'),
-                xpick=req.x,
-                ypick=req.y,
-                xplace=xplace,
-                yplace=yplace,
-                hist_max=self.distance_camera_to_table
-            )
+        x, y, z = self.perspective_calibration.from_2d_to_3d([x_pixel, y_pixel])
+        rgb_crop, depth_crop = self.generate_cropped_images(x_pixel, y_pixel, self.image_rgb, self.image_depth, req.width, req.height)
+        bridge = CvBridge()
+
+        return get_coordserviceResponse(
+            rgb_crop=bridge.cv2_to_imgmsg(rgb_crop, encoding='passthrough'),
+            depth_crop=bridge.cv2_to_imgmsg(depth_crop, encoding='passthrough'),
+            x_pixel=x_pixel,
+            y_pixel=y_pixel,
+            x_robot=x,
+            y_robot=y,
+            z_robot=z
+        )
 
 
     #Generate random point inside the box contour
@@ -269,8 +225,6 @@ class InBoxCoord:
             largeur = oi
             longueur = o_i
 
-        dist_min2 = int(self.distance_camera_to_table - BOX_ELEVATION - PART_HEIGHT/2) # distance camera to the bottom box
-
         point_ok = False
         while not point_ok:
             x = random.randrange(0, largeur)
@@ -282,11 +236,10 @@ class InBoxCoord:
             y2 = y2 + int(pt_ref[1])
             print('x2 y2 après',x2, y2)
             print('profondeur du pixel----------------------', self.image_depth[y2][x2])
-            if point_type == PLACE:
+            if point_type == InBoxCoord.PLACE:
                 point_ok = True
             elif 450 < self.image_depth[y2][x2] < 480:  # PICK case
-                    point_ok = True
-
+                point_ok = True
 
         if not self.image_depth[y2][x2] in range(1, self.distance_camera_to_table - 3):
             rospy.loginfo(f'Generating another randpoint due to bad value of depth: {self.image_depth[y2][x2]}')
@@ -316,7 +269,7 @@ class InBoxCoord:
         self.refresh_rgb_and_depth_images()
         self.swap_pick_and_place_boxes_if_needed(self.image_depth)
 
-        if point_type == PICK:
+        if point_type == InBoxCoord.PICK:
             return self.generate_random_point_in_box(self.pick_box, self.pick_box_angle, point_type)
         else:
             return self.generate_random_point_in_box(self.place_box, self.place_box_angle, point_type)
@@ -353,4 +306,5 @@ class InBoxCoord:
 ###################################################################################################################
 
 if __name__ == '__main__':
+    pc = PerspectiveCalibration()
     IBC = InBoxCoord()
