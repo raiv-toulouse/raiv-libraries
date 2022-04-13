@@ -23,6 +23,9 @@ class InBoxCoord:
     # Used to specify the type of point to generate
     PICK = 1
     PLACE = 2
+    # Used to specify if we want a point on an object or just a point in the box (but not necessary on an object)
+    ON_OBJECT = True
+    IN_THE_BOX = False
 
     def __init__(self, perspective_calibration):
 
@@ -195,12 +198,17 @@ class InBoxCoord:
             x_pixel, y_pixel = req.x, req.y
 
         x, y, z = self.perspective_calibration.from_2d_to_3d([x_pixel, y_pixel])
-        rgb_crop, depth_crop = self.generate_cropped_images(x_pixel, y_pixel, self.image_rgb, self.image_depth, req.width, req.height)
-        bridge = CvBridge()
+        if req.type_of_point == InBoxCoord.PICK:
+            rgb_crop, depth_crop = self.generate_cropped_images(x_pixel, y_pixel, self.image_rgb, self.image_depth, req.width, req.height)
+            bridge = CvBridge()
+            rgb_crop = bridge.cv2_to_imgmsg(rgb_crop, encoding='passthrough')
+            depth_crop = bridge.cv2_to_imgmsg(depth_crop, encoding='passthrough')
+        else : # for PLACE, we don't need to ci=ompute crop images
+            rgb_crop, depth_crop = None, None
 
         return get_coordserviceResponse(
-            rgb_crop=bridge.cv2_to_imgmsg(rgb_crop, encoding='passthrough'),
-            depth_crop=bridge.cv2_to_imgmsg(depth_crop, encoding='passthrough'),
+            rgb_crop=rgb_crop,
+            depth_crop=depth_crop,
             x_pixel=x_pixel,
             y_pixel=y_pixel,
             x_robot=x,
@@ -307,4 +315,4 @@ class InBoxCoord:
 
 if __name__ == '__main__':
     pc = PerspectiveCalibration()
-    IBC = InBoxCoord()
+    IBC = InBoxCoord(pc)
