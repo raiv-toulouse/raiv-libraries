@@ -23,7 +23,7 @@ coord_serv = rospy.ServiceProxy('In_box_coordService', get_coordservice)
 ct = 0
 while True:
     try:
-        resp = coord_serv('random', InBoxCoord.PICK, InBoxCoord.IN_THE_BOX, CROP_WIDTH, CROP_HEIGHT, None, None)
+        resp = coord_serv('random', InBoxCoord.PICK, InBoxCoord.ON_OBJECT, CROP_WIDTH, CROP_HEIGHT, None, None)
         cv2.circle(rgb, (resp.x_pixel, resp.y_pixel), radius=2, color=(0, 0, 255), thickness=-1)
         resp = coord_serv('random', InBoxCoord.PLACE, InBoxCoord.IN_THE_BOX, CROP_WIDTH, CROP_HEIGHT, None, None)
         cv2.circle(rgb, (resp.x_pixel, resp.y_pixel), radius=2, color=(255, 0, 0), thickness=-1)
