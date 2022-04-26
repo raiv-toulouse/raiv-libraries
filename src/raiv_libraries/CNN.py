@@ -9,7 +9,7 @@ from typing import Optional
 from torch.optim import lr_scheduler
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.optim.optimizer import Optimizer
-from torchmetrics.functional import accuracy, precision, recall, confusion_matrix, f1, fbeta
+from torchmetrics.functional import accuracy, precision, recall, confusion_matrix, f1_score, fbeta_score
 
 BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
 
@@ -293,16 +293,16 @@ class CNN(pl.LightningModule):
         preds = torch.argmax(logits[1], dim=1)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
-        f1_score = f1(preds, y, num_classes=2, average='weighted')
-        fb05_score = fbeta(preds, y, num_classes=2, average='weighted', beta=0.5)
-        fb2_score = fbeta(preds, y, num_classes=2, average='weighted', beta=2)
+        f1score = f1_score(preds, y, num_classes=2, average='weighted')
+        fb05_score = fbeta_score(preds, y, num_classes=2, average='weighted', beta=0.5)
+        fb2_score = fbeta_score(preds, y, num_classes=2, average='weighted', beta=2)
         cm = confusion_matrix(preds, y, num_classes=2, )
         prec = precision(preds, y, num_classes=2, average='weighted')
         rec = recall(preds, y, num_classes=2, average='weighted')
         # au_roc = auroc(preds, y, pos_label=1)
         return {'loss': loss,
                 'acc': acc,
-                'f1_score': f1_score,
+                'f1_score': f1score,
                 'f05_score': fb05_score,
                 'f2_score': fb2_score,
                 'precision': prec,
@@ -320,7 +320,7 @@ class CNN(pl.LightningModule):
                                 for output in outputs]).sum().float()
         acc_mean /= (len(outputs) * self.batch_size)
 
-        f1_score = torch.stack([output['f1_score']
+        f1score = torch.stack([output['f1_score']
                                 for output in outputs]).mean()
 
         f05_score = torch.stack([output['f05_score']
@@ -341,7 +341,7 @@ class CNN(pl.LightningModule):
                                           self.current_epoch)
 
         self.logger.experiment.add_scalar(f'F1_Score/{name}',
-                                          f1_score,
+                                          f1score,
                                           self.current_epoch)
         self.logger.experiment.add_scalar(f'F05_Score/{name}',
                                           f05_score,
