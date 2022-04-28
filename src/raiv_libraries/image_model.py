@@ -16,6 +16,7 @@ from raiv_libraries.image_data_module import ImageDataModule
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from pathlib import Path
+from raiv_libraries.image_tools import ImageTools
 
 plt.switch_backend('agg')
 torch.set_printoptions(linewidth=120)
@@ -28,7 +29,7 @@ class ImageModel:
                  dataset_size=None,
                  batch_size=8,
                  num_epochs=20,
-                 img_size=256,
+                 img_size=ImageTools.IMAGE_SIZE_FOR_NN,
                  fine_tuning=True):
         super(ImageModel, self).__init__()
         # Parameters
@@ -44,7 +45,6 @@ class ImageModel:
         # For getting the features for the image
         self.activation = {}
         # Save the model after every epoch by monitoring a quantity.
-#        self.MODEL_CKPT_PATH = os.path.join(ckpt_dir, f'model/{self.model_name}/')
         self.MODEL_CKPT_PATH = Path(ckpt_dir)
         self.MODEL_CKPT = self.MODEL_CKPT_PATH / 'model-{epoch:02d}-{val_loss:.2f}'
         # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
@@ -56,7 +56,7 @@ class ImageModel:
         self.image_module.setup()
         # Samples required by the custom ImagePredictionLogger callback to log image predictions.
         val_samples = next(iter(self.image_module.val_dataloader()))
-        grid = self.image_module.inv_trans(torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2))
+        grid = ImageTools.inv_trans(torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2))
         # Tensorboard Logger used
         logger = TensorBoardLogger('runs', name=f'Model_{self.model_name}')
         # write to tensorboard
@@ -137,11 +137,11 @@ class ImageModel:
         # plot the images in the batch, along with predicted and true labels
         my_dpi = 96 # For my monitor (see https://www.infobyip.com/detectmonitordpi.php)
         nb_images = len(images)
-        fig = plt.figure(figsize=(nb_images * 224/my_dpi, 224/my_dpi), dpi=my_dpi)
+        fig = plt.figure(figsize=(nb_images * ImageTools.IMAGE_SIZE_FOR_NN/my_dpi, ImageTools.IMAGE_SIZE_FOR_NN/my_dpi), dpi=my_dpi)
         class_names = self.image_module._find_classes()
         for idx in np.arange(nb_images):
             ax = fig.add_subplot(1, nb_images, idx + 1, xticks=[], yticks=[])
-            img = self.image_module.inv_trans(images[idx])
+            img = ImageTools.inv_trans(images[idx])
             npimg = img.cpu().numpy()
             plt.imshow(np.transpose(npimg, (1, 2, 0)))
             ax.set_title("{0}, {1:.1f}%\n(label: {2})".format(
@@ -152,15 +152,7 @@ class ImageModel:
         return fig
 
     def _image_preprocessing(self, image):
-        transform = transforms.Compose([
-            # you can add other transformations in this list
-            # transforms.Grayscale(num_output_channels=1),
-            transforms.CenterCrop(size=224),
-            transforms.Resize(size=256),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
-        image_tensor = transform(image).float()
+        image_tensor = ImageTools.transform(image).float()
         image = image_tensor.unsqueeze(0)
         return image
 
@@ -237,7 +229,7 @@ class ImageModel:
     def _find_optimal_batch_size(self, trainer):
         trainer.tune(model=self.model)
 
-    # TODO: Fuction to finetune model hyperparameters
+    # TODO: Function to finetune model hyperparameters
     def _tune_model(self, trainer):
         # Run lr finder
         self._find_lr(trainer)

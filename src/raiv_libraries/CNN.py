@@ -8,12 +8,12 @@ from torch.nn import Module
 import torch.nn.functional as F
 import pytorch_lightning as pl
 import torchvision.models as models
-import torchvision.transforms as transforms
 from typing import Optional
 from torch.optim import lr_scheduler
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.optim.optimizer import Optimizer
 from torchmetrics.functional import accuracy, precision, recall, confusion_matrix, f1_score, fbeta_score
+from raiv_libraries.image_tools import ImageTools
 
 BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
 
@@ -113,7 +113,7 @@ class CNN(pl.LightningModule):
     def __init__(self,
                  learning_rate: float = 1e-3,
                  batch_size: int = 8,
-                 input_shape: list = [3, 256, 256],
+                 input_shape: list = [3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN],
                  backbone: str = 'resnet18',
                  train_bn: bool = True,
                  milestones: tuple = (5, 10),
@@ -136,11 +136,6 @@ class CNN(pl.LightningModule):
         # self.batch_size = config["batch_size"]
         # build the model
         self.__build_model()
-        self.inv_trans = transforms.Compose([transforms.Normalize(mean=[0., 0., 0.],
-                                                                 std=[1 / 0.229, 1 / 0.224, 1 / 0.225]),
-                                            transforms.Normalize(mean=[-0.485, -0.456, -0.406],
-                                                                 std=[1., 1., 1.]),
-                                            ])
 
     def __build_model(self):
         """Define model layers & loss."""
@@ -214,7 +209,7 @@ class CNN(pl.LightningModule):
         # computation graph add it during the first epoch only
         if self.current_epoch == 1:
             # sampleImg
-            sampleImg = torch.rand((1, 3, 256, 256))
+            sampleImg = torch.rand((1, 3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN))
             self.logger.experiment.add_graph(CNN(), sampleImg)
         # logging histograms
         #self.custom_histogram_adder()
@@ -243,7 +238,7 @@ class CNN(pl.LightningModule):
         print('Shape of y', y.shape)
         nb_img = len(x)
         for idx in np.arange(nb_img):
-            img = self.inv_trans(x[idx])
+            img = ImageTools.inv_trans(x[idx])
             npimg = img.cpu().numpy()
             npimgt = np.transpose(npimg, (1, 2, 0))
             image_name = str(datetime.now()) + '_' + str(idx + 1) + '.png'
