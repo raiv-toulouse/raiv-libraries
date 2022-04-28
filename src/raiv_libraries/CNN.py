@@ -1,10 +1,14 @@
 
 from typing import Generator
 import torch
+from datetime import datetime
+import numpy as np
+import cv2
 from torch.nn import Module
 import torch.nn.functional as F
 import pytorch_lightning as pl
 import torchvision.models as models
+import torchvision.transforms as transforms
 from typing import Optional
 from torch.optim import lr_scheduler
 from torch.optim.lr_scheduler import MultiStepLR
@@ -132,6 +136,11 @@ class CNN(pl.LightningModule):
         # self.batch_size = config["batch_size"]
         # build the model
         self.__build_model()
+        self.inv_trans = transforms.Compose([transforms.Normalize(mean=[0., 0., 0.],
+                                                                 std=[1 / 0.229, 1 / 0.224, 1 / 0.225]),
+                                            transforms.Normalize(mean=[-0.485, -0.456, -0.406],
+                                                                 std=[1., 1., 1.]),
+                                            ])
 
     def __build_model(self):
         """Define model layers & loss."""
@@ -230,6 +239,16 @@ class CNN(pl.LightningModule):
     # test loop
     def test_step(self, batch, batch_idx):
         x, y = batch
+        print('Shape of X', x.shape)
+        print('Shape of y', y.shape)
+        nb_img = len(x)
+        for idx in np.arange(nb_img):
+            img = self.inv_trans(x[idx])
+            npimg = img.cpu().numpy()
+            npimgt = np.transpose(npimg, (1, 2, 0))
+            image_name = str(datetime.now()) + '_' + str(idx + 1) + '.png'
+            image_path = '/common/stockage_image_test/' + image_name
+            cv2.imwrite(image_path, npimgt)
         logits = self(x)
         # 2. Compute loss & metrics:
         return self._calculate_step_metrics(logits, y)
