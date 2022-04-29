@@ -1,4 +1,6 @@
 import torchvision.transforms as transforms
+from torchvision.transforms.functional import crop
+
 
 class ImageTools:
     CROP_WIDTH = 50  # Width and height for rgb and depth cropped images
@@ -39,3 +41,8 @@ class ImageTools:
                                                               std=[1., 1., 1.]),
                                     ])
 
+    @staticmethod
+    def crop_xy(image, x, y):
+        """ Crop image at position (predict_center_x,predict_center_y) and with size (WIDTH,HEIGHT) """
+        return crop(image, y - ImageTools.CROP_HEIGHT/2, x - ImageTools.CROP_WIDTH/2,
+                    ImageTools.CROP_HEIGHT, ImageTools.CROP_WIDTH)  # top, left, height, width
