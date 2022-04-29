@@ -1,6 +1,9 @@
 
 from typing import Generator
 import torch
+from datetime import datetime
+import numpy as np
+import cv2
 from torch.nn import Module
 import torch.nn.functional as F
 import pytorch_lightning as pl
@@ -9,7 +12,8 @@ from typing import Optional
 from torch.optim import lr_scheduler
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.optim.optimizer import Optimizer
-from torchmetrics.functional import accuracy, precision, recall, confusion_matrix, f1, fbeta
+from torchmetrics.functional import accuracy, precision, recall, confusion_matrix, f1_score, fbeta_score
+from raiv_libraries.image_tools import ImageTools
 
 BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
 
@@ -109,7 +113,7 @@ class CNN(pl.LightningModule):
     def __init__(self,
                  learning_rate: float = 1e-3,
                  batch_size: int = 8,
-                 input_shape: list = [3, 256, 256],
+                 input_shape: list = [3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN],
                  backbone: str = 'resnet18',
                  train_bn: bool = True,
                  milestones: tuple = (5, 10),
@@ -205,7 +209,7 @@ class CNN(pl.LightningModule):
         # computation graph add it during the first epoch only
         if self.current_epoch == 1:
             # sampleImg
-            sampleImg = torch.rand((1, 3, 256, 256))
+            sampleImg = torch.rand((1, 3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN))
             self.logger.experiment.add_graph(CNN(), sampleImg)
         # logging histograms
         #self.custom_histogram_adder()
@@ -230,6 +234,16 @@ class CNN(pl.LightningModule):
     # test loop
     def test_step(self, batch, batch_idx):
         x, y = batch
+        print('Shape of X', x.shape)
+        print('Shape of y', y.shape)
+        nb_img = len(x)
+        for idx in np.arange(nb_img):
+            img = ImageTools.inv_trans(x[idx])
+            npimg = img.cpu().numpy()
+            npimgt = np.transpose(npimg, (1, 2, 0))
+            image_name = str(datetime.now()) + '_' + str(idx + 1) + '.png'
+            image_path = '/common/stockage_image_test/' + image_name
+            cv2.imwrite(image_path, npimgt)
         logits = self(x)
         # 2. Compute loss & metrics:
         return self._calculate_step_metrics(logits, y)
@@ -293,16 +307,16 @@ class CNN(pl.LightningModule):
         preds = torch.argmax(logits[1], dim=1)
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
-        f1_score = f1(preds, y, num_classes=2, average='weighted')
-        fb05_score = fbeta(preds, y, num_classes=2, average='weighted', beta=0.5)
-        fb2_score = fbeta(preds, y, num_classes=2, average='weighted', beta=2)
+        f1score = f1_score(preds, y, num_classes=2, average='weighted')
+        fb05_score = fbeta_score(preds, y, num_classes=2, average='weighted', beta=0.5)
+        fb2_score = fbeta_score(preds, y, num_classes=2, average='weighted', beta=2)
         cm = confusion_matrix(preds, y, num_classes=2, )
         prec = precision(preds, y, num_classes=2, average='weighted')
         rec = recall(preds, y, num_classes=2, average='weighted')
         # au_roc = auroc(preds, y, pos_label=1)
         return {'loss': loss,
                 'acc': acc,
-                'f1_score': f1_score,
+                'f1_score': f1score,
                 'f05_score': fb05_score,
                 'f2_score': fb2_score,
                 'precision': prec,
@@ -320,7 +334,7 @@ class CNN(pl.LightningModule):
                                 for output in outputs]).sum().float()
         acc_mean /= (len(outputs) * self.batch_size)
 
-        f1_score = torch.stack([output['f1_score']
+        f1score = torch.stack([output['f1_score']
                                 for output in outputs]).mean()
 
         f05_score = torch.stack([output['f05_score']
@@ -341,7 +355,7 @@ class CNN(pl.LightningModule):
                                           self.current_epoch)
 
         self.logger.experiment.add_scalar(f'F1_Score/{name}',
-                                          f1_score,
+                                          f1score,
                                           self.current_epoch)
         self.logger.experiment.add_scalar(f'F05_Score/{name}',
                                           f05_score,

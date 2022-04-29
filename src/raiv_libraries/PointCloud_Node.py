@@ -38,8 +38,8 @@ class PointCloud:
         #Defining 'bridge', which is necessary to transform the image from ROS msg to cv2 UInt16 with one channel
         bridge = CvBridge()
 
-        cv2.namedWindow('MedianFilter & Normalization')
-        cv2.createTrackbar('ksize', 'MedianFilter & Normalization', 1, 19, self.nothing)
+        #cv2.namedWindow('MedianFilter & Normalization')
+        #cv2.createTrackbar('ksize', 'MedianFilter & Normalization', 1, 19, self.nothing)
 
         #get depth image
         depth_image = bridge.imgmsg_to_cv2(msg, desired_encoding="16UC1")
@@ -50,7 +50,7 @@ class PointCloud:
         depth_image_median = depth_image
         depth_image_median = depth_image_median.astype(np.uint8)
 
-        ksize = cv2.getTrackbarPos('ksize', 'MedianFilter & Normalization')
+        ksize = 10  #DEBUG cv2.getTrackbarPos('ksize', 'MedianFilter & Normalization')
 
         #The Kernel size can only be an odd number in order to have a center pixel. So if it's even, we add one.
         if (ksize%2) == 0:
@@ -65,15 +65,15 @@ class PointCloud:
         depth_image = depth_image.astype(np.uint8)
 
         #Display the images
-        cv2.imshow('MedianFilter & Normalization', depth_image_median)
-        cv2.imshow('Without Filter', depth_image)
-        cv2.waitKey(10)
+        #cv2.imshow('MedianFilter & Normalization', depth_image_median)
+        #cv2.imshow('Without Filter', depth_image)
+        #cv2.waitKey(10)
 
         #Publishing the now dated Msg into the publisher previously defined
         self.pub.publish(msg)
         self.r.sleep()
 
-    def nothing(self):
+    def nothing(self, val):
         pass
 
 PC = PointCloud()
