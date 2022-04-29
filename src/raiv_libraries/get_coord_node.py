@@ -191,7 +191,7 @@ class InBoxCoord:
     def process_service(self, req):
 
         if req.mode == 'random':
-            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point)
+            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object)
         elif req.mode == 'fixed':
             x_pixel, y_pixel = req.x, req.y
 
@@ -217,7 +217,7 @@ class InBoxCoord:
 
 
     #Generate random point inside the box contour
-    def generate_random_point_in_box(self, box, angle, point_type):
+    def generate_random_point_in_box(self, box, angle, point_type, on_object):
         #This part of the code allows us to know what is the angle we are given by OpenCV
         o_i = int(math.sqrt((box[-1][0]-box[2][0])**2+(box[-1][1]-box[2][1])**2))
         oi = int(math.sqrt((box[-1][0]-box[0][0])**2+(box[-1][1]-box[0][1])**2))
@@ -243,9 +243,9 @@ class InBoxCoord:
             y2 = y2 + int(pt_ref[1])
             print('x2 y2 après',x2, y2)
             print('profondeur du pixel----------------------', self.image_depth[y2][x2])
-            if point_type == InBoxCoord.PLACE:
+            if on_object == InBoxCoord.IN_THE_BOX:
                 point_ok = True
-            elif 450 < self.image_depth[y2][x2] < 480:  # PICK case
+            elif 370 < self.image_depth[y2][x2] < 480:  # PICK case
                 point_ok = True
 
         if not self.image_depth[y2][x2] in range(1, self.distance_camera_to_table - 3):
@@ -271,15 +271,15 @@ class InBoxCoord:
 
 
     # Generate a cropped image which center is a random point in the pick or place box
-    def generate_random_pick_or_place_points(self, point_type):
+    def generate_random_pick_or_place_points(self, point_type, on_object):
 
         self.refresh_rgb_and_depth_images()
         self.swap_pick_and_place_boxes_if_needed(self.image_depth)
 
         if point_type == InBoxCoord.PICK:
-            return self.generate_random_point_in_box(self.pick_box, self.pick_box_angle, point_type)
+            return self.generate_random_point_in_box(self.pick_box, self.pick_box_angle, point_type, on_object)
         else:
-            return self.generate_random_point_in_box(self.place_box, self.place_box_angle, point_type)
+            return self.generate_random_point_in_box(self.place_box, self.place_box_angle, point_type, on_object)
 
 
     # Determine if the pick box is empty, if so, the pick box becomes the place one and the place box becomes the pick one

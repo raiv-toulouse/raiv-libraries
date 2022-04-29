@@ -3,15 +3,13 @@
 from collections import Counter
 import numpy as np
 import matplotlib.pyplot as plt
-import cv2
-from PIL import Image as im
 import os
 import torchvision
-import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torch
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, random_split, Subset, WeightedRandomSampler
+from raiv_libraries.image_tools import ImageTools
 
 
 class ImageDataModule(pl.LightningDataModule):
@@ -22,31 +20,6 @@ class ImageDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.data_dir = data_dir
         self.dataset_size = dataset_size
-        self.transform = transforms.Compose([
-            # you can add other transformations in this list
-            # transforms.Grayscale(num_output_channels=1),
-            transforms.CenterCrop(size=224),  # Ancien code, les images font 256x256
-            transforms.Resize(size=256),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
-
-        self.augmentation = transforms.Compose([
-            transforms.CenterCrop(size=224),
-            transforms.RandomResizedCrop(size=256, scale=(0.8, 1.0)),
-            transforms.RandomRotation(degrees=15),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
-
-        # Used to correctly display images
-        self.inv_trans = transforms.Compose([transforms.Normalize(mean=[0., 0., 0.],
-                                                                 std=[1 / 0.229, 1 / 0.224, 1 / 0.225]),
-                                            transforms.Normalize(mean=[-0.485, -0.456, -0.406],
-                                                                 std=[1., 1., 1.]),
-                                            ])
-
 
     def _calculate_weights(self, dataset):
         class_count = Counter(dataset.targets)
@@ -85,9 +58,9 @@ class ImageDataModule(pl.LightningDataModule):
         print("Len Test Data", len(test_data))
 
         # self.train_data = TransformSubset(train_data, transform=self.augmentation)
-        self.train_data = TransformSubset(train_data, transform=self.augmentation)
-        self.val_data = TransformSubset(val_data, transform=self.transform)
-        self.test_data = TransformSubset(test_data, transform=self.transform)
+        self.train_data = TransformSubset(train_data, transform=ImageTools.augmentation)
+        self.val_data = TransformSubset(val_data, transform=ImageTools.transform)
+        self.test_data = TransformSubset(test_data, transform=ImageTools.transform)
 
         # Ce code prend beaucoup de temps à s'exécuter.
         # print('Targets Train:', TransformSubset(self.train_data).count_targets())
@@ -137,7 +110,7 @@ class ImageDataModule(pl.LightningDataModule):
         fig = plt.figure(figsize=(nb_images * 256 / my_dpi, 256 / my_dpi), dpi=my_dpi)
         for idx in np.arange(nb_images):
             ax = fig.add_subplot(1, nb_images, idx + 1, xticks=[], yticks=[])
-            img = self.inv_trans(images[idx])
+            img = ImageTools.inv_trans(images[idx])
             npimg = img.cpu().numpy()
             npimgt = np.transpose(npimg, (1, 2, 0))
             img256 = npimg*256
@@ -186,5 +159,5 @@ if __name__ == '__main__':
     grid = torchvision.utils.make_grid(images, nrow=8, padding=2)
     writer = SummaryWriter()
     writer.add_figure('images with labels', image_module.plot_classes_images(images, labels))
-    writer.add_image('some_images', image_module.inv_trans(grid))
+    writer.add_image('some_images', ImageTools.inv_trans(grid))
     writer.close()
