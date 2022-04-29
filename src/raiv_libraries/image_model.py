@@ -264,6 +264,6 @@ if __name__ == '__main__':
     parser.add_argument('ckpt_folder', type=str, help='folder path where to stock the model.CKPT file generated')
     args = parser.parse_args()
 
-    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, num_epochs=20, dataset_size=None)
+    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, num_epochs=5, dataset_size=None)
     image_model.call_trainer(data_dir=args.images_folder)  # Train model
     print('End of model training')
