@@ -56,7 +56,7 @@ class Robot_with_vaccum_gripper(RobotUR):
         self._send_gripper_message(True, timer=1)   # Vaccum gripper ON
         communication_problem = True
         while communication_problem:  # Infinite loop until the movement is completed
-            communication_problem = self._down_movement(movement_duration=10)
+            communication_problem = self._down_movement(movement_duration=5)
         self._back_to_previous_z()  # Back to the original z pose (go up)
         object_gripped = self.check_if_object_gripped()
         return object_gripped
