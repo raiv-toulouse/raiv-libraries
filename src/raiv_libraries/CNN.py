@@ -240,10 +240,12 @@ class CNN(pl.LightningModule):
         for idx in np.arange(nb_img):
             img = ImageTools.inv_trans(x[idx])
             npimg = img.cpu().numpy()
+            npimg = npimg*256
             npimgt = np.transpose(npimg, (1, 2, 0))
             image_name = str(datetime.now()) + '_' + str(idx + 1) + '.png'
             image_path = '/common/stockage_image_test/' + image_name
-            cv2.imwrite(image_path, npimgt)
+            img_rgb = cv2.cvtColor(npimgt, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(image_path, img_rgb)
         logits = self(x)
         # 2. Compute loss & metrics:
         return self._calculate_step_metrics(logits, y)
