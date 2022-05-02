@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
+import matplotlib
 import torchvision.transforms.functional as F
 import torch
 
@@ -68,13 +69,21 @@ class ImageTools:
         return F.to_pil_image(tensor_image)
 
     @staticmethod
-    def show_image(imgs, title='Images'):
-        if not isinstance(imgs, list):
+    def show_image(imgs, title='Images', inv_needed=True):
+        """
+        Display image(s) in a matplotlib window.
+        Image can be of type : opencv, PIL, list of images, tensor [3,W,H], tensor [batch_size, 3, W, H]
+        For tensor, if inv_needed is True, appli the denormalization transform
+        """
+        matplotlib.use('Qt5Agg')
+        if not isinstance(imgs, list) and not (isinstance(imgs, torch.Tensor) and imgs.ndimension() == 4) : # not a LIST or not a Tensor type : [batch_size, nb_channels, width, height]
             imgs = [imgs]
         fix, axs = plt.subplots(ncols=len(imgs), squeeze=False)
         for i, img in enumerate(imgs):
             if isinstance(img, torch.Tensor):  # Tensor Image
                 img = img.detach()
+                if inv_needed:
+                    img = ImageTools.inv_trans(img)
                 img = F.to_pil_image(img)
             elif isinstance(img, np.ndarray):  # OpenCV image
                 img = ImageTools.opencv_to_pil(img)

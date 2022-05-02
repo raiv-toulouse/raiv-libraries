@@ -18,7 +18,7 @@ import torch.nn.functional as F
 from pathlib import Path
 from raiv_libraries.image_tools import ImageTools
 
-plt.switch_backend('agg')
+plt.switch_backend('Qt5Agg')
 torch.set_printoptions(linewidth=120)
 
 
@@ -56,6 +56,7 @@ class ImageModel:
         self.image_module.setup()
         # Samples required by the custom ImagePredictionLogger callback to log image predictions.
         val_samples = next(iter(self.image_module.val_dataloader()))
+        ImageTools.show_image(val_samples[0])  # ImageTools.show_image(val_samples[0][0]) to show only the first iamge (not all images in the batch
         grid = ImageTools.inv_trans(torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2))
         # Tensorboard Logger used
         logger = TensorBoardLogger('runs', name=f'Model_{self.model_name}')
