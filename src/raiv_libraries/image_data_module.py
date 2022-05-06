@@ -112,8 +112,6 @@ class ImageDataModule(pl.LightningDataModule):
             ax = fig.add_subplot(1, nb_images, idx + 1, xticks=[], yticks=[])
             img = ImageTools.inv_trans(images[idx])
             npimg = img.cpu().numpy()
-            npimgt = np.transpose(npimg, (1, 2, 0))
-            img256 = npimg*256
             plt.imshow(np.transpose(npimg, (1, 2, 0)))
             ax.set_title(class_names[labels[idx]])
         return fig

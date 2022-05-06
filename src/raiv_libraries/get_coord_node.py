@@ -194,6 +194,8 @@ class InBoxCoord:
             x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object)
         elif req.mode == 'fixed':
             x_pixel, y_pixel = req.x, req.y
+        elif req.mode == 'random_no_refresh':
+            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, refresh = False)
 
         x, y, z = self.perspective_calibration.from_2d_to_3d([x_pixel, y_pixel])
         print(x, y, z)
@@ -250,7 +252,7 @@ class InBoxCoord:
 
         if not self.image_depth[y2][x2] in range(1, self.distance_camera_to_table - 3):
             rospy.loginfo(f'Generating another randpoint due to bad value of depth: {self.image_depth[y2][x2]}')
-            return self.generate_random_point_in_box(box, angle, point_type)
+            return self.generate_random_point_in_box(box, angle, point_type, on_object)
 
         return x2, y2
 
@@ -271,10 +273,10 @@ class InBoxCoord:
 
 
     # Generate a cropped image which center is a random point in the pick or place box
-    def generate_random_pick_or_place_points(self, point_type, on_object):
-
-        self.refresh_rgb_and_depth_images()
-        self.swap_pick_and_place_boxes_if_needed(self.image_depth)
+    def generate_random_pick_or_place_points(self, point_type, on_object, refresh = True):
+        if refresh == True :
+            self.refresh_rgb_and_depth_images()
+            self.swap_pick_and_place_boxes_if_needed(self.image_depth)
 
         if point_type == InBoxCoord.PICK:
             return self.generate_random_point_in_box(self.pick_box, self.pick_box_angle, point_type, on_object)
