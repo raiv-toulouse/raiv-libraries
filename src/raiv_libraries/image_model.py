@@ -56,7 +56,7 @@ class ImageModel:
         self.image_module.setup()
         # Samples required by the custom ImagePredictionLogger callback to log image predictions.
         val_samples = next(iter(self.image_module.val_dataloader()))
-        ImageTools.show_image(val_samples[0])  # ImageTools.show_image(val_samples[0][0]) to show only the first iamge (not all images in the batch
+        #ImageTools.show_image(val_samples[0])  # ImageTools.show_image(val_samples[0][0]) to show only the first iamge (not all images in the batch
         grid = ImageTools.inv_trans(torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2))
         # Tensorboard Logger used
         logger = TensorBoardLogger('runs', name=f'Model_{self.model_name}')
@@ -69,14 +69,15 @@ class ImageModel:
         trainer = pl.Trainer(max_epochs=self.num_epochs,
                              devices="auto", accelerator="auto",
                              auto_select_gpus=False,
+                             auto_lr_find=True,
                              logger=logger,
                              #deterministic=True,  Fail with bincount non deterministic operation
                              progress_bar_refresh_rate=0,  # To remove the progress bar
                              #callbacks=[early_stop_callback, checkpoint_callback])
                              callbacks=[checkpoint_callback])
         # Config Hyperparameters ################################################
-        if self.fine_tuning:
-            self._tune_model(trainer)
+#       # if self.fine_tuning:  Generate bugs (see https://github.com/PyTorchLightning/pytorch-lightning/discussions/7092)
+        # self._tune_model(trainer)
         # Train model ################################################
         start_fit = time.time()
         trainer.fit(model=self.model, datamodule=self.image_module)
@@ -233,8 +234,24 @@ class ImageModel:
     # TODO: Function to finetune model hyperparameters
     def _tune_model(self, trainer):
         # Run lr finder
-        self._find_lr(trainer)
-        self._find_optimal_batch_size(trainer)
+        # Run learning rate finder
+        lr_finder = trainer.tuner.lr_find(self.model)
+
+        # Results can be found in
+        print(lr_finder.results)
+
+        # Plot with
+        fig = lr_finder.plot(suggest=True)
+        fig.show()
+
+        # Pick point based on plot, or get suggestion
+        new_lr = lr_finder.suggestion()
+        print(new_lr)
+        # update hparams of the model
+        self.model.hparams.lr = new_lr
+
+        #self._find_lr(trainer)
+        #self._find_optimal_batch_size(trainer)
 
     def _images_to_probs(self, images):
         '''
@@ -259,6 +276,7 @@ class ImageModel:
 # --- MAIN ----
 if __name__ == '__main__':
     import argparse
+    import time
 
     parser = argparse.ArgumentParser(description='Train a CNN with images from specified images folder. View results with : tensorboard --logdir=runs')
     parser.add_argument('images_folder', type=str, help='images folder with fail and success sub-folders')
@@ -266,5 +284,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, num_epochs=5, dataset_size=None)
+    start = time.time()
     image_model.call_trainer(data_dir=args.images_folder)  # Train model
+    end = time.time()
+    print("Elapsed time = ", end-start, " seconds")
     print('End of model training')
