@@ -28,7 +28,7 @@ class ImageTools:
 
     augmentation = transforms.Compose([
         transforms.Resize(size=IMAGE_SIZE_BEFORE_CROP),
-        transforms.RandomRotation(degrees=15),
+        #transforms.RandomRotation(degrees=15),
         transforms.RandomCrop(size=IMAGE_SIZE_FOR_NN),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
@@ -37,7 +37,7 @@ class ImageTools:
     ])
 
     transform_image = transforms.Compose([
-        transforms.Resize(size=IMAGE_SIZE_BEFORE_CROP),
+        transforms.Resize(size=IMAGE_SIZE_FOR_NN),
         transforms.ToTensor(),
         tranform_normalize
     ])
