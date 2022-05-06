@@ -276,6 +276,7 @@ class ImageModel:
 # --- MAIN ----
 if __name__ == '__main__':
     import argparse
+    import time
 
     parser = argparse.ArgumentParser(description='Train a CNN with images from specified images folder. View results with : tensorboard --logdir=runs')
     parser.add_argument('images_folder', type=str, help='images folder with fail and success sub-folders')
@@ -283,5 +284,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, num_epochs=5, dataset_size=None)
+    start = time.time()
     image_model.call_trainer(data_dir=args.images_folder)  # Train model
+    end = time.time()
+    print("Elapsed time = ", end-start, " seconds")
     print('End of model training')
