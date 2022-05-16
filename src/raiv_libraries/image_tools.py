@@ -72,6 +72,7 @@ class ImageTools:
     def show_image(imgs, files=None, title='Images', inv_needed=True):
         """
         Display image(s) in a matplotlib window.
+        If files, display the original files (directly read from disk)
         Image can be of type : opencv, PIL, list of images, tensor [3,W,H], tensor [batch_size, 3, W, H]
         For tensor, if inv_needed is True, appli the denormalization transform
         """
