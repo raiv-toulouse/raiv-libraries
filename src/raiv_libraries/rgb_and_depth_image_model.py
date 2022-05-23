@@ -11,8 +11,8 @@ from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from torchvision import transforms
 from pytorch_lightning.loggers import TensorBoardLogger
-from raiv_libraries.new_CNN import NewCNN
-from raiv_libraries.new_image_data_module import NewImageDataModule
+from raiv_libraries.double_CNN import DoubleCNN
+from raiv_libraries.rgb_and_depth_image_data_module import RgbAndDepthImageDataModule
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from pathlib import Path
@@ -40,7 +40,7 @@ class RgbAndDepthImageModel:
         # Set a seed  ################################################
         seed_everything(42)
         # Load model  ################################################
-        self.model = NewCNN(backbone=model_name)
+        self.model = DoubleCNN(backbone=model_name)
         self.model_name = model_name
         # For getting the features for the image
         self.activation = {}
@@ -51,7 +51,7 @@ class RgbAndDepthImageModel:
         self.fine_tuning = fine_tuning
 
     def call_trainer(self, data_dir_rgb, data_dir_depth):
-        self.image_module = NewImageDataModule(data_dir_rgb, data_dir_depth, batch_size=self.batch_size, dataset_size=self.dataset_size)
+        self.image_module = RgbAndDepthImageDataModule(data_dir_rgb, data_dir_depth, batch_size=self.batch_size, dataset_size=self.dataset_size)
         # Load images  ################################################
         self.image_module.setup()
         # Samples required by the custom ImagePredictionLogger callback to log image predictions.
