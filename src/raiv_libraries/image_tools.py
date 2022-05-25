@@ -69,16 +69,17 @@ class ImageTools:
         return F.to_pil_image(tensor_image)
 
     @staticmethod
-    def show_image(imgs, title='Images', inv_needed=True):
+    def show_image(imgs, files=None, title='Images', inv_needed=True):
         """
         Display image(s) in a matplotlib window.
+        If files, display the original files (directly read from disk)
         Image can be of type : opencv, PIL, list of images, tensor [3,W,H], tensor [batch_size, 3, W, H]
         For tensor, if inv_needed is True, appli the denormalization transform
         """
         matplotlib.use('Qt5Agg')
         if not isinstance(imgs, list) and not (isinstance(imgs, torch.Tensor) and imgs.ndimension() == 4) : # not a LIST or not a Tensor type : [batch_size, nb_channels, width, height]
             imgs = [imgs]
-        fix, axs = plt.subplots(ncols=len(imgs), squeeze=False)
+        fix, axs = plt.subplots(nrows=2 if files else 1, ncols=len(imgs), squeeze=False)
         for i, img in enumerate(imgs):
             if isinstance(img, torch.Tensor):  # Tensor Image
                 img = img.detach()
@@ -89,6 +90,10 @@ class ImageTools:
                 img = ImageTools.opencv_to_pil(img)
             axs[0, i].imshow(np.asarray(img))
             axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+            img_file = Image.open(files[i])
+            if files:
+                axs[1, i].imshow(np.asarray(img_file))
+                axs[1, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
         plt.suptitle(title)
         plt.show()
 
