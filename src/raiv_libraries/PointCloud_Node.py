@@ -66,9 +66,10 @@ class PointCloud:
 
         #Display the images
         #cv2.imshow('MedianFilter & Normalization', depth_image_median)
-        #cv2.imshow('Without Filter', depth_image)
-        #cv2.waitKey(10)
+        cv2.imshow('Without Filter', depth_image)
+        cv2.waitKey(10)
 
+        #Publishing the now dated Msg into the publisher previously defined
         #Publishing the now dated Msg into the publisher previously defined
         self.pub.publish(msg)
         self.r.sleep()

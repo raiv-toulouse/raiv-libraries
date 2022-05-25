@@ -9,10 +9,13 @@ from raiv_libraries.srv import get_coordservice, get_coordserviceResponse
 from raiv_camera_calibration.perspective_calibration import PerspectiveCalibration
 import math
 import random
+import sys
+#from PIL import Image
 
 THRESHOLD_ABOVE_TABLE = 10  # Used to select all the pixels above the table
-BOX_ELEVATION = 40  # height in mm above the table for the bottom of a box
-OBJECTS_HEIGHT = 100 # height of the heap of objects in a box
+BOX_ELEVATION = 40  # 23   height in mm above the table for the bottom of a box
+OBJECTS_HEIGHT = 18
+OBJECTS_HEAP = 100 # height of the heap of objects in a box
 THRESHOLD_EMPTY_BOX = 50 # A box is empty if the maximum number of pixels < this value
 PICK_BOX_IS_LEFT = 1
 PICK_BOX_IS_RIGHT = 2
@@ -142,12 +145,12 @@ class InBoxCoord:
 
     # Function to refresh the RGB and Depth image
     def refresh_rgb_and_depth_images(self):
-
         image_rgb = rospy.wait_for_message('/RGBClean', Image)
         image_depth = rospy.wait_for_message('/Distance_Here', Image)
-
         self.image_rgb = CvBridge().imgmsg_to_cv2(image_rgb, desired_encoding='bgr8')
         self.image_depth = CvBridge().imgmsg_to_cv2(image_depth, desired_encoding='16UC1')
+        #cv2.imwrite('/common/guilem/test.png', self.image_rgb)                #Sauver l'image rgb pour guilem
+        #np.savetxt('/common/guilem/test_depth.txt',self.image_depth,fmt='%.2f')   #Ecrire la matrice pour guilem
 
 
     # Test if this box is empty
@@ -158,9 +161,9 @@ class InBoxCoord:
         mask = cv2.erode(mask, element)
 
         masked_image = cv2.bitwise_and(image, image, mask=mask)
-        dist_min = int(self.distance_camera_to_table - BOX_ELEVATION - OBJECTS_HEIGHT)
+        dist_min = int(self.distance_camera_to_table - BOX_ELEVATION - OBJECTS_HEAP)
         dist_max = int(self.distance_camera_to_table - BOX_ELEVATION)
-        hist = cv2.calcHist([masked_image], [0], mask, [OBJECTS_HEIGHT], [dist_min, dist_max])
+        hist = cv2.calcHist([masked_image], [0], mask, [OBJECTS_HEAP], [dist_min, dist_max])
 
         # if DEBUG:
         #     cv2.imshow('debug',  masked_image)
@@ -197,7 +200,8 @@ class InBoxCoord:
         elif req.mode == 'random_no_refresh':
             x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, refresh = False)
 
-        x, y, z = self.perspective_calibration.from_2d_to_3d([x_pixel, y_pixel])
+        depth = self.image_depth
+        x, y, z = self.perspective_calibration.from_2d_to_3d([x_pixel, y_pixel], depth)
         print(x, y, z)
         if req.type_of_point == InBoxCoord.PICK:
             rgb_crop, depth_crop = self.generate_cropped_images(x_pixel, y_pixel, self.image_rgb, self.image_depth, req.crop_width, req.crop_height)
@@ -240,14 +244,16 @@ class InBoxCoord:
             y = random.randrange(0, longueur)
             x2 = int(y * math.sin(math.pi / 180 * beta) + x * math.cos(math.pi / 180 * beta))
             y2 = int(y * math.cos(math.pi / 180 * beta) - x * math.sin(math.pi / 180 * beta))
-            print('x2 et y2 avant',x2,y2)
             x2 = x2 + int(pt_ref[0])
             y2 = y2 + int(pt_ref[1])
-            print('x2 y2 après',x2, y2)
             print('profondeur du pixel----------------------', self.image_depth[y2][x2])
+            #h_min = int(self.distance_camera_to_table - BOX_ELEVATION - OBJECTS_HEIGHT)
+            #h_max = int(self.distance_camera_to_table - BOX_ELEVATION - OBJECTS_HEAP)
+            #print('distance table =  ', self.distance_camera_to_table)
+            #print ('h_min = : ',h_min, 'h_max = : ', h_max)
             if on_object == InBoxCoord.IN_THE_BOX:
                 point_ok = True
-            elif 370 < self.image_depth[y2][x2] < 480:  # PICK case
+            elif 405 < self.image_depth[y2][x2] < 510:  # PICK case
                 point_ok = True
 
         if not self.image_depth[y2][x2] in range(1, self.distance_camera_to_table - 3):

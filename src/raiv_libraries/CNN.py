@@ -142,7 +142,7 @@ class CNN(pl.LightningModule):
 
         # 1. Load pre-trained network: choose the model for the pretrained network
         model_func = getattr(models, self.backbone)
-        backbone = model_func(pretrained=True)
+        backbone = model_func(pretrained=False)
         # self.feature_extractor = model_func(pretrained=True)
         # print("BEFORE CUT")
         # _layers = list(backbone.children())
@@ -156,7 +156,7 @@ class CNN(pl.LightningModule):
         # self.feature_extractor.eval()
         # freeze(module=self.feature_extractor, train_bn=self.train_bn)
         # si queremos descongelar últimas capas
-        freeze(module=self.feature_extractor, n=-2, train_bn=self.train_bn)
+        #freeze(module=self.feature_extractor, n=-2, train_bn=self.train_bn)
         # _unfreeze_and_add_param_group(
         #     module=self.feature_extractor[:-2], optimizer=optimizer, train_bn=self.train_bn
         #     )
