@@ -41,9 +41,7 @@ class ImageDatasetRgbDepth(Dataset):
 
 # --- MAIN ----
 if __name__ == '__main__':
-    from torch.utils.tensorboard import SummaryWriter
     import argparse
-    from raiv_libraries.image_tools import ImageTools
 
     parser = argparse.ArgumentParser(description='Test ImageDataModule which loads images (rgb AND depth) from specified folder. View results with : tensorboard --logdir=runs')
     parser.add_argument('images_folder_rgb', type=str, help='images folder of rgb images with fail and success sub-folders')
@@ -52,12 +50,12 @@ if __name__ == '__main__':
 
     dataset = ImageDatasetRgbDepth(args.images_folder_rgb, args.images_folder_depth)
     print(dataset)
-    rgb, depth, class_id = dataset.__getitem__(4)
-    print(rgb, depth, class_id)
+    rgb, depth, class_id, files = dataset.__getitem__(4)
+    print(rgb, depth, class_id, files)
 
     train_size = int(0.80 * len(dataset))
     val_size = int((len(dataset) - train_size) / 2)
-    test_size = int((len(dataset) - train_size) / 2)
+    test_size = len(dataset) - train_size - val_size
 
     train_set, val_set, test_set = random_split(dataset, (train_size, val_size, test_size))
 
