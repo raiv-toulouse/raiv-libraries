@@ -136,6 +136,9 @@ class CNN(pl.LightningModule):
         # self.batch_size = config["batch_size"]
         # build the model
         self.__build_model()
+        self.train_file = open('/common/data_courbes_matplotlib/train/data_model_TRAIN1.txt',
+                       'w')  # fichier texte où sont stockées les données des graph (loss, accuracy etc...)
+        self.val_file = open('/common/data_courbes_matplotlib/val/data_model_VAL1.txt', 'w')
 
     def __build_model(self):
         """Define model layers & loss."""
@@ -347,6 +350,20 @@ class CNN(pl.LightningModule):
                                  for output in outputs]).mean()
         recall = torch.stack([output['recall']
                               for output in outputs]).mean()
+
+        #Text writing
+        if name == 'Train' :
+            txt = '\n' + str(self.current_epoch)
+            self.train_file.write(txt)
+            txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
+            self.train_file.write(txt2)
+
+        if name == 'Val' :
+            txt = '\n' + str(self.current_epoch)
+            self.val_file.write(txt)
+            txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
+            self.val_file.write(txt2)
+
         # Logging scalars
         self.logger.experiment.add_scalar(f'Loss/{name}',
                                           loss_mean,
