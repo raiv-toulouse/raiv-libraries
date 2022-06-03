@@ -1,9 +1,8 @@
 import torchvision
 import torchvision.transforms as transforms
-import cv2
 from PIL import Image
 
-img = Image.open('/common/stockage_image_test/test_image2.png')
+img = Image.open('/common/stockage_image_test/theo.png')
 
 def transform(img):
     transf = transforms.Compose([
@@ -18,7 +17,7 @@ def transform(img):
 
 image = transform(img)  # Get the loaded images, resize in 256 and transformed in tensor
 pil_image = torchvision.transforms.ToPILImage()(image)
-pil_image.save("/common/stockage_image_test/image_tensor.png", format="png")
+pil_image.save("/common/stockage_image_test/theo2.png", format="png")
 
 
 

@@ -38,8 +38,6 @@ class Robot_with_vaccum_gripper(RobotUR):
         self.relative_move(0, distance, 0)
 
     def check_if_object_gripped(self):
-
-
         try:
             resp = rospy.wait_for_message('object_gripped', Bool)
             return resp.data
@@ -56,22 +54,22 @@ class Robot_with_vaccum_gripper(RobotUR):
         self._send_gripper_message(True, timer=1)   # Vaccum gripper ON
         communication_problem = True
         while communication_problem:  # Infinite loop until the movement is completed
-            communication_problem = self._down_movement(movement_duration=5)
+            communication_problem = self._down_movement(movement_duration=4)
         self._back_to_previous_z()  # Back to the original z pose (go up)
-        object_gripped = self.check_if_object_gripped()
-        return object_gripped
+
 
     # Function to place the grasped object
     def place(self, pose_for_place):
         self.go_to_pose(pose_for_place)  # Go to place to launch the object
-        # Then, we switch off the vacuum gripper so the object can be placed
-        self._send_gripper_message(False) # Vaccum gripper OFF
-        # Wait some seconds, in order to the msg to arrive to the gripper
-        time.sleep(1)
+
+    def object_gripped(self):
+        object_gripped = self.check_if_object_gripped()
+        return object_gripped
+
 
     def release_gripper(self):
         self._send_gripper_message(False)
-        time.sleep(1)
+        time.sleep(0.5)
 
     ####################### Privates methods #######################
 
@@ -136,7 +134,7 @@ class Robot_with_vaccum_gripper(RobotUR):
                     break
             # Both stop and 10 mm up movement to stop the robot
             self.trajectory_client.cancel_all_goals()
-            self.relative_move(0, 0, 0.001)
+            #self.relative_move(0, 0, 0.001)
         return communication_problem
 
 #
