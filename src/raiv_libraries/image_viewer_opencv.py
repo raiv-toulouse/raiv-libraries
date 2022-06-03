@@ -8,7 +8,8 @@ from raiv_libraries.srv import InitDirectory,InitDirectoryResponse
 #
 # Subscribe to the image topic (default : /usb_cam/image_raw) and display its images.
 # You can save the current images with this service :
-# rosservice call /record_image "data: '/home/philippe'"   (where /home/philippe is the folder where the image is saved)
+# rosservice call /record_image "data: '/home/philippe'"   (where /h
+# home/philippe is the folder where the image is saved)
 #
 
 class ImageViewerOpenCV:
