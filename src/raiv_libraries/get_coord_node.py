@@ -6,6 +6,8 @@ import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from raiv_libraries.srv import get_coordservice, get_coordserviceResponse
+from raiv_libraries.srv import BoxIsEmpty, BoxIsEmptyResponse
+from raiv_libraries.srv import PickingBoxIsEmpty, PickingBoxIsEmptyResponse
 from raiv_camera_calibration.perspective_calibration import PerspectiveCalibration
 import math
 import random
@@ -36,6 +38,10 @@ class InBoxCoord:
         self.image_depth = None
         self.distance_camera_to_table = 0
         self.service = rospy.Service('/In_box_coordService', get_coordservice, self.process_service)
+        self.service_empty_box = rospy.Service('/Empty_Box', BoxIsEmpty, self.empty_box_service)
+        rospy.wait_for_service('/Empty_Box')
+        self.call_service = rospy.ServiceProxy('/Empty_Box', BoxIsEmpty)
+        self.service_empty_picking_box = rospy.Service('/Empty_Picking_Box', PickingBoxIsEmpty, self.picking_box)
         self.init_pick_and_place_boxes()
         rospy.spin()
 
@@ -152,6 +158,29 @@ class InBoxCoord:
         #cv2.imwrite('/common/guilem/test.png', self.image_rgb)                #Sauver l'image rgb pour guilem
         #np.savetxt('/common/guilem/test_depth.txt',self.image_depth,fmt='%.2f')   #Ecrire la matrice pour guilem
 
+    # recup the arg request and call the is_box_empty
+    def empty_box_service(self, req):
+        histogram = cv2.calcHist([self.image_depth], [0], None, [1000], [1, 1000])
+        distance_camera_to_table = histogram.argmax()
+        image_depth_without_table = np.where(self.image_depth <= distance_camera_to_table - THRESHOLD_ABOVE_TABLE, self.image_depth, 0)
+        if req.box == 'right':
+            self.box = self.rightbox
+        elif req.box == 'left':
+            self.box = self.leftbox
+
+        empty_flag = self.is_box_empty(self.box, image_depth_without_table)
+        return BoxIsEmptyResponse(
+            empty_box=empty_flag)
+
+    def picking_box(self, req):
+        if self.picking_box == PICK_BOX_IS_RIGHT:
+            vide_box = self.call_service('right').empty_box
+
+        else:
+            vide_box = self.call_service('left').empty_box
+
+        return PickingBoxIsEmptyResponse(
+            empty_box=vide_box)
 
     # Test if this box is empty
     def is_box_empty(self, box, image):
@@ -192,13 +221,23 @@ class InBoxCoord:
 
     # Treat the request received by the service
     def process_service(self, req):
+        """
+        In-box_coord_service have 4 modes:
 
+        * random : This mode launch the service with a rgb, deepth image refresh and he control the swap
+        * Fixed : This mode is the same as the random mode but the pixel is defined in the call of the service
+        * random_no_refresh : This mode launch the service with the same rgb and deepth image, no refresh is processed
+        * random_no_swap : This mode launch the service with just a rgb and deepth refresh but no swap
+
+        """
         if req.mode == 'random':
             x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object)
         elif req.mode == 'fixed':
             x_pixel, y_pixel = req.x, req.y
         elif req.mode == 'random_no_refresh':
-            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, refresh = False)
+            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, refresh=False, swap=False)
+        elif req.mode == 'random_no_swap':
+            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, swap=False)
 
         depth = self.image_depth
         x, y, z = self.perspective_calibration.from_2d_to_3d([x_pixel, y_pixel], depth)
@@ -279,9 +318,10 @@ class InBoxCoord:
 
 
     # Generate a cropped image which center is a random point in the pick or place box
-    def generate_random_pick_or_place_points(self, point_type, on_object, refresh = True):
+    def generate_random_pick_or_place_points(self, point_type, on_object, refresh = True, swap = True):
         if refresh == True :
             self.refresh_rgb_and_depth_images()
+        if swap == True :
             self.swap_pick_and_place_boxes_if_needed(self.image_depth)
 
         if point_type == InBoxCoord.PICK:
@@ -291,11 +331,11 @@ class InBoxCoord:
 
 
     # Determine if the pick box is empty, if so, the pick box becomes the place one and the place box becomes the pick one
-    def swap_pick_and_place_boxes_if_needed(self, image):
+    def swap_pick_and_place_boxes_if_needed(self, image_depth_without_table):
 
         # In this part of the function we calculate the mean height inside the designated box, we then compare this
         # mean height to value determined empirically to decide if the box is still full or empty
-        image_depth_without_table = np.where(self.image_depth <= self.distance_camera_to_table - THRESHOLD_ABOVE_TABLE, self.image_depth, 0)
+
         vide_left = self.is_box_empty(self.leftbox, image_depth_without_table)
         vide_right = self.is_box_empty(self.rightbox, image_depth_without_table)
 
