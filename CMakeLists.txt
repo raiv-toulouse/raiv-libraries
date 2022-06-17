@@ -38,6 +38,7 @@ add_service_files(
    ObjectGripped.srv
    BoxIsEmpty.srv
    PickingBoxIsEmpty.srv
+   ClearPrediction.srv
 )
 
 ## Generate added messages and services with any dependencies listed here

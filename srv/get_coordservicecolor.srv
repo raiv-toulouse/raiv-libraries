@@ -1,0 +1,15 @@
+string mode # 'random' or 'fixed' or 'random_no_refresh' or 'random_no_swap'
+uint8 type_of_point # 1 for pick, 2 for place
+bool on_object # True if we want a point ON an object
+uint16 crop_width
+uint16 crop_height
+uint16 x # In case of 'fixed', the (x,y) pixel coordinates
+uint16 y
+---
+sensor_msgs/Image rgb_crop
+sensor_msgs/Image depth_crop
+uint16 x_pixel # Coordinates in image frame (pixel)
+uint16 y_pixel
+float64 x_robot # Coordinates in robot frame (meter)
+float64 y_robot
+float64 z_robot

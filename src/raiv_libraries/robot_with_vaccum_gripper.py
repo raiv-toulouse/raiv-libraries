@@ -69,7 +69,7 @@ class Robot_with_vaccum_gripper(RobotUR):
 
     def release_gripper(self):
         self._send_gripper_message(False)
-        time.sleep(0.5)
+        #time.sleep(0.5)
 
     ####################### Privates methods #######################
 
