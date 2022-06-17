@@ -9,10 +9,11 @@ from raiv_libraries.srv import get_coordservice, get_coordserviceResponse
 from raiv_libraries.srv import BoxIsEmpty, BoxIsEmptyResponse
 from raiv_libraries.srv import PickingBoxIsEmpty, PickingBoxIsEmptyResponse
 from raiv_camera_calibration.perspective_calibration import PerspectiveCalibration
+from raiv_libraries.image_tools import ImageTools
 import math
 import random
 import sys
-#from PIL import Image
+from PIL import Image as PILImage
 
 THRESHOLD_ABOVE_TABLE = 10  # Used to select all the pixels above the table
 BOX_ELEVATION = 40  # 23   height in mm above the table for the bottom of a box
@@ -41,7 +42,7 @@ class InBoxCoord:
         self.service_empty_box = rospy.Service('/Empty_Box', BoxIsEmpty, self.empty_box_service)
         rospy.wait_for_service('/Empty_Box')
         self.call_service = rospy.ServiceProxy('/Empty_Box', BoxIsEmpty)
-        self.service_empty_picking_box = rospy.Service('/Empty_Picking_Box', PickingBoxIsEmpty, self.picking_box)
+        self.service_empty_picking_box = rospy.Service('/Empty_Picking_Box', PickingBoxIsEmpty, self.empty_picking_box)
         self.init_pick_and_place_boxes()
         rospy.spin()
 
@@ -172,7 +173,7 @@ class InBoxCoord:
         return BoxIsEmptyResponse(
             empty_box=empty_flag)
 
-    def picking_box(self, req):
+    def empty_picking_box(self, req):
         if self.picking_box == PICK_BOX_IS_RIGHT:
             vide_box = self.call_service('right').empty_box
 
@@ -231,23 +232,30 @@ class InBoxCoord:
 
         """
         if req.mode == 'random':
-            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object)
+            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, color=False)
         elif req.mode == 'fixed':
             x_pixel, y_pixel = req.x, req.y
         elif req.mode == 'random_no_refresh':
-            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, refresh=False, swap=False)
+            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, refresh=False, swap=False, color=False)
         elif req.mode == 'random_no_swap':
-            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, swap=False)
+            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, swap=False, color=False)
+        elif req.mode == 'color':
+            x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, color=True)
 
         depth = self.image_depth
         x, y, z = self.perspective_calibration.from_2d_to_3d([x_pixel, y_pixel], depth)
         print(x, y, z)
         if req.type_of_point == InBoxCoord.PICK:
-            rgb_crop, depth_crop = self.generate_cropped_images(x_pixel, y_pixel, self.image_rgb, self.image_depth, req.crop_width, req.crop_height)
+            rgb_pil = ImageTools.numpy_to_pil(self.image_rgb)
+            depth_pil = ImageTools.numpy_to_pil(self.image_depth)
+            rgb_crop_pil = ImageTools.crop_xy(rgb_pil, x_pixel, y_pixel)
+            depth_crop_pil = ImageTools.crop_xy(depth_pil, x_pixel, y_pixel)
+            rgb_crop = ImageTools.pil_to_numpy(rgb_crop_pil)
+            depth_crop = ImageTools.pil_to_numpy(depth_crop_pil)
             bridge = CvBridge()
             rgb_crop = bridge.cv2_to_imgmsg(rgb_crop, encoding='passthrough')
             depth_crop = bridge.cv2_to_imgmsg(depth_crop, encoding='passthrough')
-        else : # for PLACE, we don't need to ci=ompute crop images
+        else : # for PLACE, we don't need to compute crop images
             rgb_crop, depth_crop = None, None
 
         return get_coordserviceResponse(
@@ -259,7 +267,6 @@ class InBoxCoord:
             y_robot=y,
             z_robot=z
         )
-
 
     #Generate random point inside the box contour
     def generate_random_point_in_box(self, box, angle, point_type, on_object):
@@ -318,16 +325,63 @@ class InBoxCoord:
 
 
     # Generate a cropped image which center is a random point in the pick or place box
-    def generate_random_pick_or_place_points(self, point_type, on_object, refresh = True, swap = True):
+    def generate_random_pick_or_place_points(self, point_type, on_object, refresh = True, swap = True, color=False):
         if refresh == True :
             self.refresh_rgb_and_depth_images()
         if swap == True :
             self.swap_pick_and_place_boxes_if_needed(self.image_depth)
 
-        if point_type == InBoxCoord.PICK:
+        if color==False and point_type == InBoxCoord.PICK:
             return self.generate_random_point_in_box(self.pick_box, self.pick_box_angle, point_type, on_object)
-        else:
+        if color==False and point_type == InBoxCoord.PLACE:
             return self.generate_random_point_in_box(self.place_box, self.place_box_angle, point_type, on_object)
+
+        if color==True and point_type == InBoxCoord.PICK:
+            print("zzzzeeeeebbbbiii")
+            return self.generate_random_point_in_box_color(self.pick_box, self.pick_box_angle, point_type, on_object)
+
+    def generate_random_point_in_box_color(self, box, angle, point_type, on_object):
+        # This part of the code allows us to know what is the angle we are given by OpenCV
+        o_i = int(math.sqrt((box[-1][0] - box[2][0]) ** 2 + (box[-1][1] - box[2][1]) ** 2))
+        oi = int(math.sqrt((box[-1][0] - box[0][0]) ** 2 + (box[-1][1] - box[0][1]) ** 2))
+        if o_i < oi:
+            beta = 90 - angle
+            pt_ref = box[0]
+            largeur = o_i
+            longueur = oi
+        else:
+            beta = -angle
+            pt_ref = box[1]
+            largeur = oi
+            longueur = o_i
+
+        point_ok = False
+        while not point_ok:
+            x = random.randrange(0, largeur)
+            y = random.randrange(0, longueur)
+            x2 = int(y * math.sin(math.pi / 180 * beta) + x * math.cos(math.pi / 180 * beta))
+            y2 = int(y * math.cos(math.pi / 180 * beta) - x * math.sin(math.pi / 180 * beta))
+            x2 = x2 + int(pt_ref[0])
+            y2 = y2 + int(pt_ref[1])
+
+
+            image_rgb = cv2.cvtColor(self.image_rgb, cv2.COLOR_BGR2RGB)
+            image_pil = ImageTools.numpy_to_pil(image_rgb)
+            image_pil.save("/common/work/stockage_image_test/test.png")
+            i = PILImage.open("/common/work/stockage_image_test/test.png")
+            (rouge, vert, bleu) = i.getpixel((x2, y2))
+            print(rouge, vert, bleu)
+            #print('profondeur du pixel----------------------', self.image_depth[y2][x2])
+            if on_object == InBoxCoord.IN_THE_BOX:
+                point_ok = True
+            elif rouge < 15 and vert > 25 and bleu < 40:
+                point_ok = True
+
+        if not self.image_depth[y2][x2] in range(1, self.distance_camera_to_table - 3):
+            rospy.loginfo(f'Generating another randpoint due to bad value of depth: {self.image_depth[y2][x2]}')
+            return self.generate_random_point_in_box_color(box, angle, point_type, on_object)
+
+        return x2, y2
 
 
     # Determine if the pick box is empty, if so, the pick box becomes the place one and the place box becomes the pick one
@@ -362,5 +416,5 @@ class InBoxCoord:
 
 if __name__ == '__main__':
     rospy.init_node('In_box_coord')
-    pc = PerspectiveCalibration('/common/calibration/camera/camera_data')
+    pc = PerspectiveCalibration('/common/work/calibration/camera/camera_data')
     IBC = InBoxCoord(pc)
