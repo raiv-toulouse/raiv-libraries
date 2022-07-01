@@ -111,6 +111,7 @@ class CNN(pl.LightningModule):
 
     # defines the network
     def __init__(self,
+                 courbe_folder = None,
                  learning_rate: float = 1e-3,
                  batch_size: int = 8,
                  input_shape: list = [3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN],
@@ -136,16 +137,17 @@ class CNN(pl.LightningModule):
         # self.batch_size = config["batch_size"]
         # build the model
         self.__build_model()
-        self.train_file = open('/common/data_courbes_matplotlib/train/data_model_TRAIN1.txt',
-                       'w')  # fichier texte où sont stockées les données des graph (loss, accuracy etc...)
-        self.val_file = open('/common/data_courbes_matplotlib/val/data_model_VAL1.txt', 'w')
+        if courbe_folder is not None:
+            self.train_file = open(courbe_folder + '/train/data_model_train1.txt',
+                           'w')  # fichier texte où sont stockées les données des graph (loss, accuracy etc...)
+            self.val_file = open(courbe_folder + '/val/data_model_val1.txt', 'w')
 
     def __build_model(self):
         """Define model layers & loss."""
 
         # 1. Load pre-trained network: choose the model for the pretrained network
         model_func = getattr(models, self.backbone)
-        backbone = model_func(pretrained=False)
+        backbone = model_func(pretrained=True)
         # self.feature_extractor = model_func(pretrained=True)
         # print("BEFORE CUT")
         # _layers = list(backbone.children())

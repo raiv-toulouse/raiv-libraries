@@ -26,6 +26,7 @@ class ImageModel:
     def __init__(self,
                  model_name,
                  ckpt_dir,
+                 courbe_folder,
                  dataset_size=None,
                  batch_size=8,
                  num_epochs=20,
@@ -40,7 +41,7 @@ class ImageModel:
         # Set a seed  ################################################
         # seed_everything(42)
         # Load model  ################################################
-        self.model = CNN(backbone=model_name)
+        self.model = CNN(backbone=model_name, courbe_folder=courbe_folder)
         self.model_name = model_name
         # For getting the features for the image
         self.activation = {}
@@ -281,9 +282,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a CNN with images from specified images folder. View results with : tensorboard --logdir=runs')
     parser.add_argument('images_folder', type=str, help='images folder with fail and success sub-folders')
     parser.add_argument('ckpt_folder', type=str, help='folder path where to stock the model.CKPT file generated')
+    parser.add_argument('courbe_path', type=str, help='Optionnal path folder .txt where the informations of the model will be stocked for courbes_CNN.py', default=None)
     args = parser.parse_args()
 
-    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, num_epochs=20, dataset_size=None)
+    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, courbe_folder=args.courbe_path, num_epochs=20, dataset_size=None,)
     start = time.time()
     image_model.call_trainer(data_dir=args.images_folder)  # Train model
     end = time.time()
