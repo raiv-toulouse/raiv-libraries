@@ -240,16 +240,6 @@ class DoubleCNN(pl.LightningModule):
         rgb, depth, y, _ = batch
         print('Shape of X', rgb.shape)
         print('Shape of y', y.shape)
-        nb_img = len(rgb)
-        for idx in np.arange(nb_img):
-            img = ImageTools.inv_trans(rgb[idx])
-            npimg = img.cpu().numpy()
-            npimg = npimg*256
-            npimgt = np.transpose(npimg, (1, 2, 0))
-            image_name = str(datetime.now()) + '_' + str(idx + 1) + '.png'
-            image_path = '/common/stockage_image_test/' + image_name
-            img_rgb = cv2.cvtColor(npimgt, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(image_path, img_rgb)
         logits = self(rgb, depth)
         # 2. Compute loss & metrics:
         return self._calculate_step_metrics(logits, y)
