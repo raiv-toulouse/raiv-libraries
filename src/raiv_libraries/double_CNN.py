@@ -134,6 +134,9 @@ class DoubleCNN(pl.LightningModule):
         self.num_workers = num_workers
         # build the model
         self.__build_model()
+        self.train_file = open('/common/data_courbes_matplotlib/DEPTH/150im_depth/train/data_model_TRAIN1.txt',
+                       'w')  # fichier texte où sont stockées les données des graph (loss, accuracy etc...)
+        self.val_file = open('/common/data_courbes_matplotlib/DEPTH/150im_depth/val/data_model_VAL1.txt', 'w')
 
     def __build_features_layers(self, model_func):
         """ Return the freezed layers of the pretrained CNN specified by model_func parameter."""
@@ -237,16 +240,6 @@ class DoubleCNN(pl.LightningModule):
         rgb, depth, y, _ = batch
         print('Shape of X', rgb.shape)
         print('Shape of y', y.shape)
-        nb_img = len(rgb)
-        for idx in np.arange(nb_img):
-            img = ImageTools.inv_trans(rgb[idx])
-            npimg = img.cpu().numpy()
-            npimg = npimg*256
-            npimgt = np.transpose(npimg, (1, 2, 0))
-            image_name = str(datetime.now()) + '_' + str(idx + 1) + '.png'
-            image_path = '/common/stockage_image_test/' + image_name
-            img_rgb = cv2.cvtColor(npimgt, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(image_path, img_rgb)
         logits = self(rgb, depth)
         # 2. Compute loss & metrics:
         return self._calculate_step_metrics(logits, y)
@@ -347,6 +340,19 @@ class DoubleCNN(pl.LightningModule):
                                  for output in outputs]).mean()
         recall = torch.stack([output['recall']
                               for output in outputs]).mean()
+        # Text writing
+        if name == 'Train' :
+            txt = '\n' + str(self.current_epoch)
+            self.train_file.write(txt)
+            txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
+            self.train_file.write(txt2)
+
+        if name == 'Val' :
+            txt = '\n' + str(self.current_epoch)
+            self.val_file.write(txt)
+            txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
+            self.val_file.write(txt2)
+
         # Logging scalars
         self.logger.experiment.add_scalar(f'Loss/{name}',
                                           loss_mean,
