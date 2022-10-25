@@ -38,7 +38,7 @@ class RgbAndDepthImageModel:
         self.img_size = img_size
         self.dataset_size = dataset_size
         # Set a seed  ################################################
-        seed_everything(42)
+        #seed_everything(42)
         # Load model  ################################################
         self.model = DoubleCNN(backbone=model_name)
         self.model_name = model_name

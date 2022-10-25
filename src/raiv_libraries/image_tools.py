@@ -10,10 +10,12 @@ import torch
 
 
 class ImageTools:
-    CROP_WIDTH = 50  # Width and height for rgb and depth cropped images
-    CROP_HEIGHT = 50
+    CROP_WIDTH = 75  # Width and height for rgb and depth cropped images
+    CROP_HEIGHT = 75
     IMAGE_SIZE_FOR_NN = 224
     IMAGE_SIZE_BEFORE_CROP = 256
+    INITIAL_WIDTH = 640
+    INITIAL_HEIGHT = 480
 
     tranform_normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
@@ -52,13 +54,29 @@ class ImageTools:
 
     @staticmethod
     def crop_xy(image, x, y):
-        """ Crop image at position (predict_center_x,predict_center_y) and with size (WIDTH,HEIGHT) """
+        """ Crop image PIL at position (predict_center_x,predict_center_y) and with size (WIDTH,HEIGHT) """
         return crop(image, y - ImageTools.CROP_HEIGHT/2, x - ImageTools.CROP_WIDTH/2,
                     ImageTools.CROP_HEIGHT, ImageTools.CROP_WIDTH)  # top, left, height, width
 
     @staticmethod
     def pil_to_opencv(pil_image):
-        return cv2.cvtColor(np.asarray(pil_image),cv2.COLOR_RGB2BGR)
+        #return cv2.cvtColor(np.asarray(pil_image),cv2.COLOR_RGB2BGR)
+        return np.asarray(pil_image)
+
+    @staticmethod
+    def sensor_msg_to_pil(msg):
+        """ Recover the image in the msg sensor_msgs.Image message and convert it to a PILImage"""
+        size = (ImageTools.CROP_WIDTH, ImageTools.CROP_HEIGHT)  # Image size
+        img = Image.frombytes('RGB', size, msg.data)  # sensor_msg Image to PILImage
+        return img
+
+    @staticmethod
+    def numpy_to_pil(numpy):
+        return Image.fromarray(numpy)
+
+    @staticmethod
+    def pil_to_numpy(pil_image):
+        return np.array(pil_image)
 
     @staticmethod
     def opencv_to_pil(opencv_image):

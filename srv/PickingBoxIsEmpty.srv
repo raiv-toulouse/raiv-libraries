@@ -1,0 +1,3 @@
+---
+bool empty_box #True if the right box is empty
+
