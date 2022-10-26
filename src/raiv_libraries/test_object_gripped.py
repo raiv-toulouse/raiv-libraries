@@ -29,7 +29,7 @@ def handle_object_gripped(req):
 
     #Move the robot to the test position
     my_robot.go_to_pose(geometry_msgs.Pose(
-                    geometry_msgs.Vector3(0.442, -0.022, 0.125), tool_test_gripped_pose
+                    geometry_msgs.Vector3(0.21, -0.27, 0.12), tool_test_gripped_pose
                 ), DELAY_TO_MOVE)
 
     #Read image
@@ -37,8 +37,8 @@ def handle_object_gripped(req):
     cv_image_rgb = CvBridge().imgmsg_to_cv2(rgb, desired_encoding ='bgr8')
 
     #Crop the image and convert BGR to HSV
-    cropped_image = cv_image_rgb[350:402, 297:402]
-    hsv = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2HSV)
+    #cropped_image = cv_image_rgb[350:402, 297:402]
+    hsv = cv2.cvtColor(cv_image_rgb, cv2.COLOR_BGR2HSV)
 
     #Color strength parameters in HSV
     weaker = np.array([40, 40, 40])

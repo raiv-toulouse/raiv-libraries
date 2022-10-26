@@ -10,6 +10,7 @@ import torch
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, random_split, Subset, WeightedRandomSampler
 from raiv_libraries.image_tools import ImageTools
+import cv2
 
 
 class ImageDataModule(pl.LightningDataModule):
@@ -124,8 +125,11 @@ class TransformSubset(Dataset):
 
     def __getitem__(self, index):
         x, y = self.subset[index]
+        img = ImageTools.pil_to_numpy(x)
+        image_bgr_to_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        image = ImageTools.numpy_to_pil(image_bgr_to_rgb)
         if self.transform:
-            x = self.transform(x)
+            x = self.transform(image)
         return x, y
 
     def __len__(self):

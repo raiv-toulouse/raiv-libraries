@@ -416,5 +416,5 @@ class InBoxCoord:
 
 if __name__ == '__main__':
     rospy.init_node('In_box_coord')
-    pc = PerspectiveCalibration('/common/work/calibration/camera/camera_data')
+    pc = PerspectiveCalibration('/common/save/calibration/camera/camera_data')
     IBC = InBoxCoord(pc)
