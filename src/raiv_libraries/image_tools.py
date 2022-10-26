@@ -10,8 +10,8 @@ import torch
 
 
 class ImageTools:
-    CROP_WIDTH = 75  # Width and height for rgb and depth cropped images
-    CROP_HEIGHT = 75
+    CROP_WIDTH = 50  # Width and height for rgb and depth cropped images
+    CROP_HEIGHT = 50
     IMAGE_SIZE_FOR_NN = 224
     IMAGE_SIZE_BEFORE_CROP = 256
     INITIAL_WIDTH = 640
