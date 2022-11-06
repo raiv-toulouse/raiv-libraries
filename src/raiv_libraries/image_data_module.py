@@ -125,11 +125,8 @@ class TransformSubset(Dataset):
 
     def __getitem__(self, index):
         x, y = self.subset[index]
-        img = ImageTools.pil_to_numpy(x)
-        image_bgr_to_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        image = ImageTools.numpy_to_pil(image_bgr_to_rgb)
         if self.transform:
-            x = self.transform(image)
+            x = self.transform(x)
         return x, y
 
     def __len__(self):
@@ -157,6 +154,8 @@ if __name__ == '__main__':
     image_module = ImageDataModule(data_dir=args.images_folder, batch_size=8)
     image_module.setup()
     images, labels = next(iter(image_module.val_dataloader()))
+    print(images.shape)
+    ImageTools.show_image(images[0])
     print(images[0].shape)
     grid = torchvision.utils.make_grid(images, nrow=8, padding=2)
     writer = SummaryWriter()
