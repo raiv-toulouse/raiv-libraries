@@ -108,8 +108,8 @@ class ImageTools:
                 img = ImageTools.opencv_to_pil(img)
             axs[0, i].imshow(np.asarray(img))
             axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
-            img_file = Image.open(files[i])
             if files:
+                img_file = Image.open(files[i])
                 axs[1, i].imshow(np.asarray(img_file))
                 axs[1, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
         plt.suptitle(title)
