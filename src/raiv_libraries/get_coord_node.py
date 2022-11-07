@@ -65,8 +65,8 @@ class InBoxCoord:
         self.init_left_and_right_boxes(image_depth_without_table)
         vide_left = self.is_box_empty(self.leftbox, image_depth_without_table)
         vide_right = self.is_box_empty(self.rightbox, image_depth_without_table)
-        rospy.loginfo(f'La boite gauche est vide : {vide_left}')
-        rospy.loginfo(f'La boite droite est vide : {vide_right}')
+        rospy.loginfo(f'Left box is {"empty" if vide_left else "full"}')
+        rospy.loginfo(f'Right box is {"empty" if vide_right else "full"}')
         # The empty box is for placing, the other one is for picking
         if vide_right:
             rospy.loginfo('Left box for picking')
