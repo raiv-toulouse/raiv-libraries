@@ -12,7 +12,7 @@ from raiv_libraries.get_coord_node import InBoxCoord
 CROP_WIDTH = CROP_HEIGHT = 50
 
 rospy.init_node('test_get_coord_node')
-rgb = rospy.wait_for_message("/RGBClean",  Image)
+rgb = rospy.wait_for_message("/camera/color/image_raw",  Image)
 rgb = CvBridge().imgmsg_to_cv2(rgb, desired_encoding ='bgr8')
 
 cv2.namedWindow('debug')

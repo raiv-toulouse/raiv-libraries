@@ -72,6 +72,6 @@ if __name__ == '__main__':
     rospy.init_node('test_image')
     rate = rospy.Rate(0.5)
     app = QApplication(sys.argv)
-    gui = TestImage(image_topic='/Distance_Here')
+    gui = TestImage(image_topic='/camera/aligned_depth_to_color/image_raw')
     gui.show()
     sys.exit(app.exec_())

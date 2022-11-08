@@ -33,7 +33,7 @@ def handle_object_gripped(req):
                 ), DELAY_TO_MOVE)
 
     #Read image
-    rgb = rospy.wait_for_message("/RGBClean",  Image)
+    rgb = rospy.wait_for_message("/camera/color/image_raw",  Image)
     cv_image_rgb = CvBridge().imgmsg_to_cv2(rgb, desired_encoding ='bgr8')
 
     #Crop the image and convert BGR to HSV
