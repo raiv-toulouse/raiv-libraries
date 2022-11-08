@@ -152,8 +152,8 @@ class InBoxCoord:
 
     # Function to refresh the RGB and Depth image
     def refresh_rgb_and_depth_images(self):
-        image_rgb = rospy.wait_for_message('/RGBClean', Image)
-        image_depth = rospy.wait_for_message('/Distance_Here', Image)
+        image_rgb = rospy.wait_for_message('/camera/color/image_raw', Image)
+        image_depth = rospy.wait_for_message('/camera/aligned_depth_to_color/image_raw', Image)
         self.image_rgb = CvBridge().imgmsg_to_cv2(image_rgb, desired_encoding='bgr8')
         self.image_depth = CvBridge().imgmsg_to_cv2(image_depth, desired_encoding='16UC1')
         #cv2.imwrite('/common/guilem/test.png', self.image_rgb)                #Sauver l'image rgb pour guilem
