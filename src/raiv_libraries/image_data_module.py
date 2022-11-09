@@ -15,10 +15,11 @@ import cv2
 
 class ImageDataModule(pl.LightningDataModule):
 
-    def __init__(self, data_dir, batch_size, dataset_size=None):
+    def __init__(self, data_dir, batch_size, dataset_size=None, num_workers=8):
         super().__init__()
         self.trains_dims = None
         self.batch_size = batch_size
+        self.num_workers = num_workers
         self.data_dir = data_dir
         self.dataset_size = dataset_size
 
@@ -68,16 +69,25 @@ class ImageDataModule(pl.LightningDataModule):
         # print('Targets Val:', TransformSubset(self.val_data).count_targets())
         # print('Targets Test:', TransformSubset(self.test_data).count_targets())
 
-    def train_dataloader(self):
-        train_loader = torch.utils.data.DataLoader(self.train_data, num_workers=16, batch_size=self.batch_size)
+    def train_dataloader(self, num_workers=None):
+        if num_workers:
+            train_loader = torch.utils.data.DataLoader(self.train_data, num_workers=num_workers, batch_size=self.batch_size)
+        else:
+            train_loader = torch.utils.data.DataLoader(self.train_data, num_workers=self.num_workers, batch_size=self.batch_size)
         return train_loader
 
-    def val_dataloader(self):
-        val_loader = torch.utils.data.DataLoader(self.val_data, num_workers=16, batch_size=self.batch_size)
+    def val_dataloader(self, num_workers=None):
+        if num_workers:
+            val_loader = torch.utils.data.DataLoader(self.val_data, num_workers=num_workers, batch_size=self.batch_size)
+        else:
+            val_loader = torch.utils.data.DataLoader(self.val_data, num_workers=self.num_workers, batch_size=self.batch_size)
         return val_loader
 
-    def test_dataloader(self):
-        test_loader = torch.utils.data.DataLoader(self.test_data, num_workers=16, batch_size=self.batch_size)
+    def test_dataloader(self, num_workers=None):
+        if num_workers:
+            test_loader = torch.utils.data.DataLoader(self.test_data, num_workers=num_workers, batch_size=self.batch_size)
+        else:
+            test_loader = torch.utils.data.DataLoader(self.test_data, num_workers=self.num_workers, batch_size=self.batch_size)
         return test_loader
 
     # TODO: Método para acceder a las clases
@@ -149,16 +159,34 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Test ImageDataModule which loads images from specified folder. View results with : tensorboard --logdir=runs')
     parser.add_argument('images_folder', type=str, help='images folder with fail and success sub-folders')
+    parser.add_argument('-t', '--test_num_workers', action="store_true", help='if we want to perform a num_workers test')
     args = parser.parse_args()
 
-    image_module = ImageDataModule(data_dir=args.images_folder, batch_size=8)
+    image_module = ImageDataModule(data_dir=args.images_folder, batch_size=8, num_workers=8)
     image_module.setup()
-    images, labels = next(iter(image_module.val_dataloader()))
-    print(images.shape)
-    ImageTools.show_image(images[0])
-    print(images[0].shape)
-    grid = torchvision.utils.make_grid(images, nrow=8, padding=2)
-    writer = SummaryWriter()
-    writer.add_figure('images with labels', image_module.plot_classes_images(images, labels))
-    writer.add_image('some_images', ImageTools.inv_trans(grid))
-    writer.close()
+
+    if args.test_num_workers:
+        print('test')
+        from time import time
+        import multiprocessing as mp
+
+        for num_workers in range(2, mp.cpu_count(), 2):
+            train_loader = image_module.train_dataloader(num_workers=num_workers) #DataLoader(train_reader, shuffle=True, num_workers=num_workers, batch_size=64, pin_memory=True)
+            start = time()
+            for epoch in range(1, 3):
+                for i, data in enumerate(train_loader, 0):
+                    pass
+            end = time()
+            print("Finish with:{} second, num_workers={}".format(end - start, num_workers))
+    else:
+        images, labels = next(iter(image_module.val_dataloader()))
+        print(images.shape)
+        ImageTools.show_image(images[0])
+        print(images[0].shape)
+        grid = torchvision.utils.make_grid(images, nrow=8, padding=2)
+        writer = SummaryWriter()
+        writer.add_figure('images with labels', image_module.plot_classes_images(images, labels))
+        writer.add_image('some_images', ImageTools.inv_trans(grid))
+        writer.close()
+
+
