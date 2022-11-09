@@ -118,8 +118,7 @@ class CNN(pl.LightningModule):
                  backbone: str = 'resnet18',
                  train_bn: bool = True,
                  milestones: tuple = (5, 10),
-                 lr_scheduler_gamma: float = 1e-1,
-                 num_workers: int = 6):
+                 lr_scheduler_gamma: float = 1e-1):
 
         super(CNN, self).__init__()
         # parameters
@@ -132,7 +131,7 @@ class CNN(pl.LightningModule):
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.lr_scheduler_gamma = lr_scheduler_gamma
-        self.num_workers = num_workers
+        self.courbe_folder = courbe_folder
         # self.lr = config["lr"]
         # self.batch_size = config["batch_size"]
         # build the model
@@ -215,7 +214,7 @@ class CNN(pl.LightningModule):
         if self.current_epoch == 1:
             # sampleImg
             sampleImg = torch.rand((1, 3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN))
-            self.logger.experiment.add_graph(CNN(), sampleImg)
+            #BUG self.logger.experiment.add_graph(self, sampleImg)
         # logging histograms
         #self.custom_histogram_adder()
         # Calculate metrics
@@ -354,17 +353,18 @@ class CNN(pl.LightningModule):
                               for output in outputs]).mean()
 
         #Text writing
-        if name == 'Train' :
-            txt = '\n' + str(self.current_epoch)
-            self.train_file.write(txt)
-            txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
-            self.train_file.write(txt2)
+        if self.courbe_folder:
+            if name == 'Train' :
+                txt = '\n' + str(self.current_epoch)
+                self.train_file.write(txt)
+                txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
+                self.train_file.write(txt2)
 
-        if name == 'Val' :
-            txt = '\n' + str(self.current_epoch)
-            self.val_file.write(txt)
-            txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
-            self.val_file.write(txt2)
+            if name == 'Val' :
+                txt = '\n' + str(self.current_epoch)
+                self.val_file.write(txt)
+                txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
+                self.val_file.write(txt2)
 
         # Logging scalars
         self.logger.experiment.add_scalar(f'Loss/{name}',
