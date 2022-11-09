@@ -26,7 +26,7 @@ class ImageModel:
     def __init__(self,
                  model_name,
                  ckpt_dir,
-                 courbe_folder,
+                 courbe_folder=None,
                  dataset_size=None,
                  batch_size=8,
                  num_epochs=20,
@@ -63,7 +63,7 @@ class ImageModel:
         logger = TensorBoardLogger('runs', name=f'Model_{self.model_name}')
         # write to tensorboard
         logger.experiment.add_image('test', grid)
-        logger.close()
+        logger.finalize("success")
         # Load callbacks ########################################
         checkpoint_callback, early_stop_callback = self._config_callbacks()
         # Trainer  ################################################
@@ -73,7 +73,6 @@ class ImageModel:
                              auto_lr_find=True,
                              logger=logger,
                              #deterministic=True,  Fail with bincount non deterministic operation
-                             progress_bar_refresh_rate=0,  # To remove the progress bar
                              #callbacks=[early_stop_callback, checkpoint_callback])
                              callbacks=[checkpoint_callback])
         # Config Hyperparameters ################################################
@@ -282,7 +281,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a CNN with images from specified images folder. View results with : tensorboard --logdir=runs')
     parser.add_argument('images_folder', type=str, help='images folder with fail and success sub-folders')
     parser.add_argument('ckpt_folder', type=str, help='folder path where to stock the model.CKPT file generated')
-    parser.add_argument('courbe_path', type=str, help='Optionnal path folder .txt where the informations of the model will be stocked for courbes_CNN.py', default=None)
+    parser.add_argument('--courbe_path', default=None, type=str, help='Optionnal path folder .txt where the informations of the model will be stocked for courbes_CNN.py')
     args = parser.parse_args()
 
     image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, courbe_folder=args.courbe_path, num_epochs=20, dataset_size=None,)
