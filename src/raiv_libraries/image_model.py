@@ -47,7 +47,7 @@ class ImageModel:
         self.activation = {}
         # Save the model after every epoch by monitoring a quantity.
         self.MODEL_CKPT_PATH = Path(ckpt_dir)
-        self.MODEL_CKPT = self.MODEL_CKPT_PATH / 'model-{epoch:02d}-{val_loss:.2f}'
+        self.MODEL_CKPT = self.MODEL_CKPT_PATH / self.model_name / 'model-{epoch:02d}-{val_loss:.2f}'
         # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
         self.fine_tuning = fine_tuning
 
