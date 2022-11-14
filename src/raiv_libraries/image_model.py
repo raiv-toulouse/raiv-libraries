@@ -284,7 +284,7 @@ if __name__ == '__main__':
     parser.add_argument('--courbe_path', default=None, type=str, help='Optionnal path folder .txt where the informations of the model will be stocked for courbes_CNN.py')
     args = parser.parse_args()
 
-    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, courbe_folder=args.courbe_path, num_epochs=20, dataset_size=None,)
+    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, courbe_folder=args.courbe_path, num_epochs=30, dataset_size=None,)
     start = time.time()
     image_model.call_trainer(data_dir=args.images_folder)  # Train model
     end = time.time()
