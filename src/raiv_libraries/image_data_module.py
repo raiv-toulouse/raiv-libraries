@@ -70,25 +70,16 @@ class ImageDataModule(pl.LightningDataModule):
         # print('Targets Test:', TransformSubset(self.test_data).count_targets())
 
     def train_dataloader(self, num_workers=None):
-        if num_workers:
-            train_loader = torch.utils.data.DataLoader(self.train_data, num_workers=num_workers, batch_size=self.batch_size)
-        else:
-            train_loader = torch.utils.data.DataLoader(self.train_data, num_workers=self.num_workers, batch_size=self.batch_size)
-        return train_loader
+        return self._generate_dataloader(self.train_data, num_workers)
 
     def val_dataloader(self, num_workers=None):
-        if num_workers:
-            val_loader = torch.utils.data.DataLoader(self.val_data, num_workers=num_workers, batch_size=self.batch_size)
-        else:
-            val_loader = torch.utils.data.DataLoader(self.val_data, num_workers=self.num_workers, batch_size=self.batch_size)
-        return val_loader
+        return self._generate_dataloader(self.val_data, num_workers)
 
     def test_dataloader(self, num_workers=None):
-        if num_workers:
-            test_loader = torch.utils.data.DataLoader(self.test_data, num_workers=num_workers, batch_size=self.batch_size)
-        else:
-            test_loader = torch.utils.data.DataLoader(self.test_data, num_workers=self.num_workers, batch_size=self.batch_size)
-        return test_loader
+        return self._generate_dataloader(self.test_data, num_workers)
+
+    def _generate_dataloader(self, data, num_workers=None):
+        return torch.utils.data.DataLoader(data, num_workers=num_workers if num_workers else self.num_workers, batch_size=self.batch_size)
 
     # TODO: Método para acceder a las clases
     def _find_classes(self):
@@ -166,7 +157,7 @@ if __name__ == '__main__':
     image_module.setup()
 
     if args.test_num_workers:
-        print('test')
+        print('test num_workers')
         from time import time
         import multiprocessing as mp
 
