@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from pathlib import Path
 from raiv_libraries.image_tools import ImageTools
+import datetime
 
 plt.switch_backend('Qt5Agg')
 torch.set_printoptions(linewidth=120)
@@ -47,7 +48,8 @@ class ImageModel:
         self.activation = {}
         # Save the model after every epoch by monitoring a quantity.
         self.MODEL_CKPT_PATH = Path(ckpt_dir)
-        self.MODEL_CKPT = self.MODEL_CKPT_PATH / self.model_name / 'model-{epoch:02d}-{val_loss:.2f}'
+        now = datetime.datetime.now()
+        self.MODEL_CKPT = self.MODEL_CKPT_PATH / self.model_name / f'model_{now.year}_{now.month}_{now.day}_{now.hour}_{now.hour}'
         # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
         self.fine_tuning = fine_tuning
 
