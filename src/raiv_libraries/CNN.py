@@ -14,6 +14,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 from torch.optim.optimizer import Optimizer
 from torchmetrics.functional import accuracy, precision, recall, confusion_matrix, f1_score, fbeta_score
 from raiv_libraries.image_tools import ImageTools
+from torchvision.models import ResNet18_Weights
 
 BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
 
@@ -146,7 +147,7 @@ class CNN(pl.LightningModule):
 
         # 1. Load pre-trained network: choose the model for the pretrained network
         model_func = getattr(models, self.backbone)
-        backbone = model_func(pretrained=True)
+        backbone = model_func(weights=ResNet18_Weights.DEFAULT) #pretrained=True)
         # self.feature_extractor = model_func(pretrained=True)
         # print("BEFORE CUT")
         # _layers = list(backbone.children())
