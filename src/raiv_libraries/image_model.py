@@ -49,7 +49,7 @@ class ImageModel:
         # Save the model after every epoch by monitoring a quantity.
         self.MODEL_CKPT_PATH = Path(ckpt_dir)
         now = datetime.datetime.now()
-        self.MODEL_CKPT = self.MODEL_CKPT_PATH / self.model_name / f'model_{now.year}_{now.month}_{now.day}_{now.hour}_{now.hour}'
+        self.MODEL_CKPT = self.MODEL_CKPT_PATH / self.model_name / f'model_{now.year}_{now.month}_{now.day}_{now.hour}_{now.minute}'
         # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
         self.fine_tuning = fine_tuning
 
