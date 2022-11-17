@@ -249,7 +249,7 @@ class InBoxCoord:
             rgb_pil = ImageTools.numpy_to_pil(self.image_rgb)
             depth_pil = ImageTools.numpy_to_pil(self.image_depth)
             rgb_crop_pil = ImageTools.crop_xy(rgb_pil, x_pixel, y_pixel)
-            depth_crop_pil = ImageTools.crop_xy(depth_pil, x_pixel, y_pixel)
+            depth_crop_pil = ImageTools.crop_xy(depth_pil, x_pixel, y_pixel, req.crop_width, req.crop_height)
             rgb_crop = ImageTools.pil_to_numpy(rgb_crop_pil)
             depth_crop = ImageTools.pil_to_numpy(depth_crop_pil)
             bridge = CvBridge()
