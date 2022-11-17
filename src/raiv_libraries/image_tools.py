@@ -63,7 +63,7 @@ class ImageTools:
         return np.asarray(pil_image)
 
     @staticmethod
-    def sensor_msg_to_pil(msg):
+    def ros_msg_to_pil(msg):
         """ Recover the image in the msg sensor_msgs.Image message and convert it to a PILImage"""
         size = (ImageTools.CROP_WIDTH, ImageTools.CROP_HEIGHT)  # Image size
         img = Image.frombytes('RGB', size, msg.data)  # sensor_msg Image to PILImage
