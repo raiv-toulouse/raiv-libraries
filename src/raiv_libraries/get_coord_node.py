@@ -39,11 +39,8 @@ class InBoxCoord:
         self.bgr_cv = None
         self.depth_cv = None
         self.distance_camera_to_table = 0
-        self.service = rospy.Service('/In_box_coordService', get_coordservice, self.process_service)
-        self.service_empty_box = rospy.Service('/Empty_Box', BoxIsEmpty, self.empty_box_service)
-        rospy.wait_for_service('/Empty_Box')
-        self.call_service = rospy.ServiceProxy('/Empty_Box', BoxIsEmpty)
-        self.service_empty_picking_box = rospy.Service('/Empty_Picking_Box', PickingBoxIsEmpty, self.empty_picking_box)
+        rospy.Service('/In_box_coordService', get_coordservice, self.process_service)
+        rospy.Service('/Is_Picking_Box_Empty', PickingBoxIsEmpty, self.is_picking_box_empty)
         self.init_pick_and_place_boxes()
         rospy.spin()
 
@@ -150,29 +147,12 @@ class InBoxCoord:
         self.bgr_cv = CvBridge().imgmsg_to_cv2(rgb_msg, desired_encoding='bgr8')
         self.depth_cv = CvBridge().imgmsg_to_cv2(depth_msg, desired_encoding='16UC1')
 
-    # recup the arg request and call the is_box_empty
-    def empty_box_service(self, req):
+    def is_picking_box_empty(self):
         histogram = cv2.calcHist([self.depth_cv], [0], None, [1000], [1, 1000])
         distance_camera_to_table = histogram.argmax()
         image_depth_without_table = np.where(self.depth_cv <= distance_camera_to_table - InBoxCoord.THRESHOLD_ABOVE_TABLE, self.depth_cv, 0)
-        if req.box == 'right':
-            self.box = self.rightbox
-        elif req.box == 'left':
-            self.box = self.leftbox
-
-        empty_flag = self.is_box_empty(self.box, image_depth_without_table)
-        return BoxIsEmptyResponse(
-            empty_box=empty_flag)
-
-    def empty_picking_box(self, req):
-        if self.picking_box == PICK_BOX_IS_RIGHT:
-            vide_box = self.call_service('right').empty_box
-
-        else:
-            vide_box = self.call_service('left').empty_box
-
-        return PickingBoxIsEmptyResponse(
-            empty_box=vide_box)
+        box = self.rightbox if PICK_BOX_IS_RIGHT else self.leftbox
+        return self.is_box_empty(box, image_depth_without_table)
 
     # Test if this box is empty
     def is_box_empty(self, box, image):
