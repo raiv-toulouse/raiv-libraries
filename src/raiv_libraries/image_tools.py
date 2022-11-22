@@ -58,6 +58,10 @@ class ImageTools:
         return crop(image, y - crop_height/2, x - crop_width/2, crop_height, crop_width)  # top, left, height, width
 
     @staticmethod
+    def center_crop(image, crop_width, crop_height):
+        return ImageTools.crop_xy(image, image.width // 2, image.height // 2, crop_width, crop_height)
+
+    @staticmethod
     def pil_to_opencv(pil_image):
         #return cv2.cvtColor(np.asarray(pil_image),cv2.COLOR_RGB2BGR)
         return np.asarray(pil_image)
@@ -65,7 +69,7 @@ class ImageTools:
     @staticmethod
     def ros_msg_to_pil(msg):
         """ Recover the image in the msg sensor_msgs.Image message and convert it to a PILImage"""
-        size = (ImageTools.CROP_WIDTH, ImageTools.CROP_HEIGHT)  # Image size
+        size = (msg.width, msg.height)  # Image size
         img = Image.frombytes('RGB', size, msg.data)  # sensor_msg Image to PILImage
         return img
 

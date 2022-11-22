@@ -5,7 +5,7 @@ import rospy
 import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-from raiv_libraries.srv import get_coordservice, get_coordserviceResponse
+from raiv_libraries.srv import get_coordservice, get_coordserviceResponse, get_coordserviceRequest
 from raiv_libraries.srv import BoxIsEmpty, BoxIsEmptyResponse
 from raiv_libraries.srv import PickingBoxIsEmpty, PickingBoxIsEmptyResponse
 from raiv_camera_calibration.perspective_calibration import PerspectiveCalibration
@@ -15,16 +15,17 @@ import random
 import sys
 from PIL import Image as PILImage
 
-THRESHOLD_ABOVE_TABLE = 10  # Used to select all the pixels above the table
+
 BOX_ELEVATION = 40  # 23   height in mm above the table for the bottom of a box
 OBJECTS_HEIGHT = 18
 OBJECTS_HEAP = 100 # height of the heap of objects in a box
 THRESHOLD_EMPTY_BOX = 50 # A box is empty if the maximum number of pixels < this value
 PICK_BOX_IS_LEFT = 1
 PICK_BOX_IS_RIGHT = 2
-PART_HEIGHT = 25  #height of a part in mm
+
 
 class InBoxCoord:
+    THRESHOLD_ABOVE_TABLE = 10  # Used to select all the pixels above the table
     # Used to specify the type of point to generate
     PICK = 1
     PLACE = 2
@@ -35,8 +36,8 @@ class InBoxCoord:
     def __init__(self, perspective_calibration):
 
         self.perspective_calibration = perspective_calibration
-        self.image_rgb = None
-        self.image_depth = None
+        self.bgr_cv = None
+        self.depth_cv = None
         self.distance_camera_to_table = 0
         self.service = rospy.Service('/In_box_coordService', get_coordservice, self.process_service)
         self.service_empty_box = rospy.Service('/Empty_Box', BoxIsEmpty, self.empty_box_service)
@@ -53,14 +54,14 @@ class InBoxCoord:
     # Search for boxes in depth image and initialize the pick and place boxes
     def init_pick_and_place_boxes(self):
         self.refresh_rgb_and_depth_images()
-        self.image_width = self.image_rgb.shape[1]
-        self.image_height = self.image_rgb.shape[0]
+        self.image_width = self.bgr_cv.shape[1]
+        self.image_height = self.bgr_cv.shape[0]
         # Calculate the histogram of the depth image
-        histogram = cv2.calcHist([self.image_depth], [0], None, [1000], [1, 1000])
+        histogram = cv2.calcHist([self.depth_cv], [0], None, [1000], [1, 1000])
         # Take the index with the maximum values (i.e. the value of the table's distance to the camera) e
         # Every pixel with a value under the table value +BOX_ELEVATION milimeters is set to zero.
         self.distance_camera_to_table = histogram.argmax()
-        image_depth_without_table = np.where(self.image_depth <= self.distance_camera_to_table - THRESHOLD_ABOVE_TABLE, self.image_depth, 0)
+        image_depth_without_table = np.where(self.depth_cv <= self.distance_camera_to_table - InBoxCoord.THRESHOLD_ABOVE_TABLE, self.depth_cv, 0)
         # Then we obtain clear contours of the boxes
         self.init_left_and_right_boxes(image_depth_without_table)
         vide_left = self.is_box_empty(self.leftbox, image_depth_without_table)
@@ -85,6 +86,17 @@ class InBoxCoord:
         else:
             rospy.loginfo('Be sure to have one empty box')
 
+    def _angle_and_nb_pts_on_left(self, box_contour):
+        box_2D = cv2.minAreaRect(box_contour)  # return center(x, y), (width, height), angle of rotation
+        angle_box = box_2D[-1]  # angla of rotation
+        box_pts_float = cv2.boxPoints(box_2D)
+        box_pts = np.int0(box_pts_float)
+        nb_pts_on_left = 0
+        for pt in box_pts:
+            if pt[0] < self.image_width / 2:
+                nb_pts_on_left += 1
+        return angle_box, nb_pts_on_left, box_pts
+
     # Get the contours of the two boxes and init the left and right boxes
     def init_left_and_right_boxes(self, image_depth_without_table):
 
@@ -106,38 +118,19 @@ class InBoxCoord:
         box1contour = cntlist[-1][0]
         box2contour = cntlist[-2][0]
 
-        box1 = cv2.minAreaRect(box1contour)
-        anglebox1 = box1[-1]
-        box2 = cv2.minAreaRect(box2contour)
-        anglebox2 = box2[-1]
+        (angle_box1, nb_pts_on_left_box1, box1_pts) = self._angle_and_nb_pts_on_left(box1contour)
+        (angle_box2, nb_pts_on_left_box2, box2_pts) = self._angle_and_nb_pts_on_left(box2contour)
 
-        box1 = cv2.boxPoints(box1)
-        box2 = cv2.boxPoints(box2)
-
-        box1 = np.int0(box1)
-        box2 = np.int0(box2)
-
-        compteurbox1 = 0
-        compteurbox2 = 0
-
-        for pt in box1:
-            if pt[0] < self.image_width / 2:
-                compteurbox1 += 1
-
-        for pt in box2:
-            if pt[0] < self.image_width / 2:
-                compteurbox2 += 1
-
-        if compteurbox1 > compteurbox2:
-            self.leftbox = box1
-            self.angleleft = anglebox1
-            self.rightbox = box2
-            self.angleright = anglebox2
+        if nb_pts_on_left_box1 > nb_pts_on_left_box2:
+            self.leftbox = box1_pts
+            self.angleleft = angle_box1
+            self.rightbox = box2_pts
+            self.angleright = angle_box2
         else:
-            self.leftbox = box2
-            self.angleleft = anglebox2
-            self.angleright = anglebox1
-            self.rightbox = box1
+            self.leftbox = box2_pts
+            self.angleleft = angle_box2
+            self.rightbox = box1_pts
+            self.angleright = angle_box1
 
         # if DEBUG:
         #     cv2.drawContours(imagergb, [self.leftbox], 0, (0, 255, 0), 3)
@@ -152,18 +145,16 @@ class InBoxCoord:
 
     # Function to refresh the RGB and Depth image
     def refresh_rgb_and_depth_images(self):
-        image_rgb = rospy.wait_for_message('/camera/color/image_raw', Image)
-        image_depth = rospy.wait_for_message('/camera/aligned_depth_to_color/image_raw', Image)
-        self.image_rgb = CvBridge().imgmsg_to_cv2(image_rgb, desired_encoding='bgr8')
-        self.image_depth = CvBridge().imgmsg_to_cv2(image_depth, desired_encoding='16UC1')
-        #cv2.imwrite('/common/guilem/test.png', self.image_rgb)                #Sauver l'image rgb pour guilem
-        #np.savetxt('/common/guilem/test_depth.txt',self.image_depth,fmt='%.2f')   #Ecrire la matrice pour guilem
+        rgb_msg = rospy.wait_for_message('/camera/color/image_raw', Image)
+        depth_msg = rospy.wait_for_message('/camera/aligned_depth_to_color/image_raw', Image)
+        self.bgr_cv = CvBridge().imgmsg_to_cv2(rgb_msg, desired_encoding='bgr8')
+        self.depth_cv = CvBridge().imgmsg_to_cv2(depth_msg, desired_encoding='16UC1')
 
     # recup the arg request and call the is_box_empty
     def empty_box_service(self, req):
-        histogram = cv2.calcHist([self.image_depth], [0], None, [1000], [1, 1000])
+        histogram = cv2.calcHist([self.depth_cv], [0], None, [1000], [1, 1000])
         distance_camera_to_table = histogram.argmax()
-        image_depth_without_table = np.where(self.image_depth <= distance_camera_to_table - THRESHOLD_ABOVE_TABLE, self.image_depth, 0)
+        image_depth_without_table = np.where(self.depth_cv <= distance_camera_to_table - InBoxCoord.THRESHOLD_ABOVE_TABLE, self.depth_cv, 0)
         if req.box == 'right':
             self.box = self.rightbox
         elif req.box == 'left':
@@ -242,13 +233,13 @@ class InBoxCoord:
         elif req.mode == 'color':
             x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, color=True)
 
-        depth = self.image_depth
+        depth = self.depth_cv
         x, y, z = self.perspective_calibration.from_2d_to_3d([x_pixel, y_pixel], depth)
         print(x, y, z)
         if req.type_of_point == InBoxCoord.PICK:
-            rgb_pil = ImageTools.numpy_to_pil(self.image_rgb)
-            depth_pil = ImageTools.numpy_to_pil(self.image_depth)
-            rgb_crop_pil = ImageTools.crop_xy(rgb_pil, x_pixel, y_pixel)
+            rgb_pil = ImageTools.numpy_to_pil(cv2.cvtColor(self.bgr_cv, cv2.COLOR_BGR2RGB))
+            depth_pil = ImageTools.numpy_to_pil(self.depth_cv)
+            rgb_crop_pil = ImageTools.crop_xy(rgb_pil, x_pixel, y_pixel, req.crop_width, req.crop_height)
             depth_crop_pil = ImageTools.crop_xy(depth_pil, x_pixel, y_pixel, req.crop_width, req.crop_height)
             rgb_crop = ImageTools.pil_to_numpy(rgb_crop_pil)
             depth_crop = ImageTools.pil_to_numpy(depth_crop_pil)
@@ -292,18 +283,18 @@ class InBoxCoord:
             y2 = int(y * math.cos(math.pi / 180 * beta) - x * math.sin(math.pi / 180 * beta))
             x2 = x2 + int(pt_ref[0])
             y2 = y2 + int(pt_ref[1])
-            print('profondeur du pixel----------------------', self.image_depth[y2][x2])
+            print('profondeur du pixel----------------------', self.depth_cv[y2][x2])
             #h_min = int(self.distance_camera_to_table - BOX_ELEVATION - OBJECTS_HEIGHT)
             #h_max = int(self.distance_camera_to_table - BOX_ELEVATION - OBJECTS_HEAP)
             #print('distance table =  ', self.distance_camera_to_table)
             #print ('h_min = : ',h_min, 'h_max = : ', h_max)
             if on_object == InBoxCoord.IN_THE_BOX:
                 point_ok = True
-            elif 405 < self.image_depth[y2][x2] < 510:  # PICK case
+            elif 405 < self.depth_cv[y2][x2] < 510:  # PICK case
                 point_ok = True
 
-        if not self.image_depth[y2][x2] in range(1, self.distance_camera_to_table - 3):
-            rospy.loginfo(f'Generating another randpoint due to bad value of depth: {self.image_depth[y2][x2]}')
+        if not self.depth_cv[y2][x2] in range(1, self.distance_camera_to_table - 3):
+            rospy.loginfo(f'Generating another randpoint due to bad value of depth: {self.depth_cv[y2][x2]}')
             return self.generate_random_point_in_box(box, angle, point_type, on_object)
 
         return x2, y2
@@ -329,7 +320,7 @@ class InBoxCoord:
         if refresh == True :
             self.refresh_rgb_and_depth_images()
         if swap == True :
-            self.swap_pick_and_place_boxes_if_needed(self.image_depth)
+            self.swap_pick_and_place_boxes_if_needed(self.depth_cv)
 
         if color==False and point_type == InBoxCoord.PICK:
             return self.generate_random_point_in_box(self.pick_box, self.pick_box_angle, point_type, on_object)
@@ -365,9 +356,12 @@ class InBoxCoord:
             y2 = y2 + int(pt_ref[1])
 
 
-            image_rgb = cv2.cvtColor(self.image_rgb, cv2.COLOR_BGR2RGB)
+            image_rgb = cv2.cvtColor(self.bgr_cv, cv2.COLOR_BGR2RGB)
             image_pil = ImageTools.numpy_to_pil(image_rgb)
             image_pil.save("/common/work/stockage_image_test/test.png")
+            print("*******************************************")
+            print("******************************************************* C EST QUOI CE TRUC?????")
+            print("*******************************************")
             i = PILImage.open("/common/work/stockage_image_test/test.png")
             (rouge, vert, bleu) = i.getpixel((x2, y2))
             print(rouge, vert, bleu)
@@ -377,8 +371,8 @@ class InBoxCoord:
             elif rouge < 15 and vert > 25 and bleu < 40:
                 point_ok = True
 
-        if not self.image_depth[y2][x2] in range(1, self.distance_camera_to_table - 3):
-            rospy.loginfo(f'Generating another randpoint due to bad value of depth: {self.image_depth[y2][x2]}')
+        if not self.depth_cv[y2][x2] in range(1, self.distance_camera_to_table - 3):
+            rospy.loginfo(f'Generating another randpoint due to bad value of depth: {self.depth_cv[y2][x2]}')
             return self.generate_random_point_in_box_color(box, angle, point_type, on_object)
 
         return x2, y2
