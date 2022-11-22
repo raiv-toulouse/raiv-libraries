@@ -284,9 +284,10 @@ if __name__ == '__main__':
     parser.add_argument('images_folder', type=str, help='images folder with fail and success sub-folders')
     parser.add_argument('ckpt_folder', type=str, help='folder path where to stock the model.CKPT file generated')
     parser.add_argument('--courbe_path', default=None, type=str, help='Optionnal path folder .txt where the informations of the model will be stocked for courbes_CNN.py')
+    parser.add_argument('-e', '--epochs', default=15, type=int, help='Optionnal number of epochs')
     args = parser.parse_args()
 
-    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, courbe_folder=args.courbe_path, num_epochs=30, dataset_size=None,)
+    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, courbe_folder=args.courbe_path, num_epochs=args.epoch, dataset_size=None,)
     start = time.time()
     image_model.call_trainer(data_dir=args.images_folder)  # Train model
     end = time.time()
