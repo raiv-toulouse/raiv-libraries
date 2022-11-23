@@ -65,8 +65,7 @@ class ImageDataModule(pl.LightningDataModule):
         print("Len Val Data", len(val_data))
         print("Len Test Data", len(test_data))
 
-        # self.train_data = TransformSubset(train_data, transform=self.augmentation)
-        self.train_data = TransformSubset(train_data, transform=ImageTools.augmentation)
+        self.train_data = TransformSubset(train_data, transform=ImageTools.transform)
         self.val_data = TransformSubset(val_data, transform=ImageTools.transform)
         self.test_data = TransformSubset(test_data, transform=ImageTools.transform)
 
