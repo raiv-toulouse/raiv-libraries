@@ -31,7 +31,8 @@ class ImageTools:
     augmentation = transforms.Compose([
         transforms.Resize(size=IMAGE_SIZE_BEFORE_CROP),
         #transforms.RandomRotation(degrees=15),
-        transforms.RandomCrop(size=IMAGE_SIZE_FOR_NN),
+        #transforms.RandomCrop(size=IMAGE_SIZE_FOR_NN), # Don't use this transformation (the center of image is not preserved)
+        transforms.CenterCrop(size=IMAGE_SIZE_FOR_NN),  # use this one instead
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
