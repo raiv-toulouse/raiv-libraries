@@ -32,7 +32,8 @@ class ImageModel:
                  batch_size=8,
                  num_epochs=20,
                  img_size=ImageTools.IMAGE_SIZE_FOR_NN,
-                 fine_tuning=True):
+                 fine_tuning=True,
+                 suffix=''):
         super(ImageModel, self).__init__()
         # Parameters
         self.batch_size = batch_size
@@ -49,7 +50,10 @@ class ImageModel:
         # Save the model after every epoch by monitoring a quantity.
         self.MODEL_CKPT_PATH = Path(ckpt_dir)
         now = datetime.datetime.now()
-        self.MODEL_CKPT = self.MODEL_CKPT_PATH / self.model_name / f'model_{now.year}_{now.month}_{now.day}_{now.hour}_{now.minute}'
+        filename = f'model_{now.year}_{now.month}_{now.day}_{now.hour}_{now.minute}'
+        if suffix != '':
+            filename = filename + suffix
+        self.MODEL_CKPT = self.MODEL_CKPT_PATH / self.model_name / filename
         # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
         self.fine_tuning = fine_tuning
 
@@ -283,11 +287,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a CNN with images from specified images folder. View results with : tensorboard --logdir=runs')
     parser.add_argument('images_folder', type=str, help='images folder with fail and success sub-folders')
     parser.add_argument('ckpt_folder', type=str, help='folder path where to stock the model.CKPT file generated')
-    parser.add_argument('--courbe_path', default=None, type=str, help='Optionnal path folder .txt where the informations of the model will be stocked for courbes_CNN.py')
+    parser.add_argument('-c', '--courbe_path', default=None, type=str, help='Optionnal path folder .txt where the informations of the model will be stocked for courbes_CNN.py')
+    parser.add_argument('-s', '--suffix_name', default='', type=str, help='Optionnal suffix to add to the model name')
     parser.add_argument('-e', '--epochs', default=15, type=int, help='Optionnal number of epochs')
     args = parser.parse_args()
 
-    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, courbe_folder=args.courbe_path, num_epochs=args.epoch, dataset_size=None,)
+    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, courbe_folder=args.courbe_path, num_epochs=args.epochs, dataset_size=None, suffix=args.suffix_name)
     start = time.time()
     image_model.call_trainer(data_dir=args.images_folder)  # Train model
     end = time.time()
