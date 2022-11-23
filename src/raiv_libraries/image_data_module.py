@@ -35,16 +35,22 @@ class ImageDataModule(pl.LightningDataModule):
     def setup(self, stage=None):
         # Build Dataset
         dataset = datasets.ImageFolder(self.data_dir)
-        weight_samples = self._calculate_weights(dataset)
+        if self.dataset_size is None:
+            weight_samples = self._calculate_weights(dataset)
+            # Select a subset of the images
+            dataset_size = len(dataset) if self.dataset_size is None else min(len(dataset), self.dataset_size)
+            samples = list(WeightedRandomSampler(weight_samples, len(weight_samples),
+                                                 replacement=False,
+                                                 generator=torch.Generator().manual_seed(42)))[:dataset_size]
+        else:  # we get self.dataset_size images from 'success' and 'fail' folders
+            total_indices = list(range(len(dataset)))
+            class_count = Counter(dataset.targets)
+            dataset_size = min(self.dataset_size, class_count[0], class_count[1])
+            fail_indices = total_indices[:dataset_size]
+            success_indices = total_indices[class_count[0]:class_count[0]+dataset_size]
+            samples = fail_indices + success_indices
+            np.random.shuffle(samples)
 
-        # Select a subset of the images
-        indices = list(range(len(dataset)))
-        dataset_size = len(dataset) if self.dataset_size is None else min(len(dataset), self.dataset_size)
-
-        samples = list(WeightedRandomSampler(weight_samples, len(weight_samples),
-                                             replacement=False,
-                                             generator=torch.Generator().manual_seed(42)))[:dataset_size]
-        # samples = list(SubsetRandomSampler(indices, generator=torch.Generator().manual_seed(42)))[:dataset_size]
         subset = Subset(dataset, indices=samples)
 
         train_size = int(0.7 * len(subset))
@@ -64,10 +70,7 @@ class ImageDataModule(pl.LightningDataModule):
         self.val_data = TransformSubset(val_data, transform=ImageTools.transform)
         self.test_data = TransformSubset(test_data, transform=ImageTools.transform)
 
-        # Ce code prend beaucoup de temps à s'exécuter.
-        # print('Targets Train:', TransformSubset(self.train_data).count_targets())
-        # print('Targets Val:', TransformSubset(self.val_data).count_targets())
-        # print('Targets Test:', TransformSubset(self.test_data).count_targets())
+
 
     def train_dataloader(self, num_workers=None):
         return self._generate_dataloader(self.train_data, num_workers)
@@ -151,9 +154,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Test ImageDataModule which loads images from specified folder. View results with : tensorboard --logdir=runs')
     parser.add_argument('images_folder', type=str, help='images folder with fail and success sub-folders')
     parser.add_argument('-t', '--test_num_workers', action="store_true", help='if we want to perform a num_workers test')
+    parser.add_argument('-d', '--dataset_size', default=None, type=int, help='Optionnal number of images for the dataset size')
     args = parser.parse_args()
 
-    image_module = ImageDataModule(data_dir=args.images_folder, batch_size=8, num_workers=8)
+    image_module = ImageDataModule(data_dir=args.images_folder, batch_size=8, num_workers=8, dataset_size=args.dataset_size)
     image_module.setup()
 
     if args.test_num_workers:
