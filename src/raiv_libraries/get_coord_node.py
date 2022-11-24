@@ -54,7 +54,8 @@ class InBoxCoord:
         self.image_width = self.bgr_cv.shape[1]
         self.image_height = self.bgr_cv.shape[0]
         # Calculate the histogram of the depth image
-        histogram = cv2.calcHist([self.depth_cv], [0], None, [1000], [1, 1000])
+        dist_max = np.max(self.depth_cv).item()
+        histogram = cv2.calcHist([self.depth_cv], [0], None, [dist_max], [1, dist_max])
         # Take the index with the maximum values (i.e. the value of the table's distance to the camera) e
         # Every pixel with a value under the table value +BOX_ELEVATION milimeters is set to zero.
         self.distance_camera_to_table = histogram.argmax()
@@ -148,7 +149,8 @@ class InBoxCoord:
         self.depth_cv = CvBridge().imgmsg_to_cv2(depth_msg, desired_encoding='16UC1')
 
     def is_picking_box_empty(self):
-        histogram = cv2.calcHist([self.depth_cv], [0], None, [1000], [1, 1000])
+        dist_max = np.max(self.depth_cv).item()
+        histogram = cv2.calcHist([self.depth_cv], [0], None, [dist_max], [1, dist_max])
         distance_camera_to_table = histogram.argmax()
         image_depth_without_table = np.where(self.depth_cv <= distance_camera_to_table - InBoxCoord.THRESHOLD_ABOVE_TABLE, self.depth_cv, 0)
         box = self.rightbox if PICK_BOX_IS_RIGHT else self.leftbox
