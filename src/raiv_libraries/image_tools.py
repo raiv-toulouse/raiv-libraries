@@ -9,6 +9,7 @@ import torchvision.transforms.functional as F
 import torch
 
 
+
 class ImageTools:
     CROP_WIDTH = 50  # Width and height for rgb and depth cropped images
     CROP_HEIGHT = 50
@@ -71,7 +72,10 @@ class ImageTools:
     def ros_msg_to_pil(msg):
         """ Recover the image in the msg sensor_msgs.Image message and convert it to a PILImage"""
         size = (msg.width, msg.height)  # Image size
-        img = Image.frombytes('RGB', size, msg.data)  # sensor_msg Image to PILImage
+        if msg.encoding == '8UC3':
+            img = Image.frombytes('RGB', size, msg.data)  # sensor_msg Image to PILImage
+        elif msg.encoding == '16UC1':  # Typically : depth image
+            img = Image.frombytes('I;16', size, msg.data)
         return img
 
     @staticmethod
@@ -126,27 +130,43 @@ class ImageTools:
 if __name__ == '__main__':
     import argparse
     from torchvision.io import read_image
+    import rospy
+    from raiv_libraries.get_coord_node import InBoxCoord
 
+    from raiv_libraries.srv import get_coordservice
+
+    rospy.init_node('image_tools')
     parser = argparse.ArgumentParser(description='Test different image conversions.')
-    parser.add_argument('img_file', type=str, help='Image file')
+    parser.add_argument('--img_file', type=str, default=None, help='Image file')
     args = parser.parse_args()
 
-    # OPENCV -> PIL
-    img_opencv = cv2.imread(args.img_file)
-    img_pil = ImageTools.opencv_to_pil(img_opencv)
-    #img_pil.show('Image PIL')
+    coord_service_name = 'In_box_coordService'
+    rospy.wait_for_service(coord_service_name)
+    coord_service = rospy.ServiceProxy(coord_service_name, get_coordservice)
+    resp_pick = coord_service('random', InBoxCoord.PICK, InBoxCoord.ON_OBJECT, ImageTools.CROP_WIDTH, ImageTools.CROP_HEIGHT, None, None)
+    rgb_pil = ImageTools.ros_msg_to_pil(resp_pick.rgb_crop)
+    rgb_pil.show()
+    depth_pil = ImageTools.ros_msg_to_pil(resp_pick.depth_crop)
+    depth_pil.show()
 
-    img_tensor = read_image(args.img_file)
-    ImageTools.show_image(img_tensor, 'Tensor')
+    if args.img_file:
 
-    # PIL -> OpenCV
-    img_pil = Image.open(args.img_file)
-    ImageTools.show_image(img_pil, 'PIL')
-    img_opencv = ImageTools.pil_to_opencv(img_pil)
-    ImageTools.show_image(img_opencv, 'OpenCV')
+        # OPENCV -> PIL
+        img_opencv = cv2.imread(args.img_file)
+        img_pil = ImageTools.opencv_to_pil(img_opencv)
+        #img_pil.show('Image PIL')
 
-    ImageTools.show_image([img_pil, img_tensor, img_opencv], 'All')
-    # Display an OPenCV window
-    cv2.imshow("OpenCV",img_opencv)
-    cv2.waitKey()
+        img_tensor = read_image(args.img_file)
+        ImageTools.show_image(img_tensor, 'Tensor')
+
+        # PIL -> OpenCV
+        img_pil = Image.open(args.img_file)
+        ImageTools.show_image(img_pil, 'PIL')
+        img_opencv = ImageTools.pil_to_opencv(img_pil)
+        ImageTools.show_image(img_opencv, 'OpenCV')
+
+        ImageTools.show_image([img_pil, img_tensor, img_opencv], 'All')
+        # Display an OPenCV window
+        cv2.imshow("OpenCV",img_opencv)
+        cv2.waitKey()
 

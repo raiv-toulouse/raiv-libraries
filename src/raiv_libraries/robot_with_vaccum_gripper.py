@@ -62,10 +62,6 @@ class Robot_with_vaccum_gripper(RobotUR):
     def place(self, pose_for_place):
         self.go_to_pose(pose_for_place)  # Go to place to launch the object
 
-    def object_gripped(self):
-        object_gripped = self.check_if_object_gripped()
-        return object_gripped
-
 
     def release_gripper(self):
         self._send_gripper_message(False)
