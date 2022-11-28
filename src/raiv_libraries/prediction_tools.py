@@ -3,9 +3,12 @@ from raiv_libraries.image_model import ImageModel
 import torch
 import ntpath
 
+from raiv_libraries.image_tools import ImageTools
+
 
 class PredictTools:
 
+    @staticmethod
     def load_model(model_path):
         ckpt_model_name = ntpath.basename(model_path)
         dir_name = ntpath.dirname(model_path)
@@ -14,11 +17,18 @@ class PredictTools:
         inference_model.freeze()
         return image_model, inference_model
 
+    @staticmethod
     def predict(model, img):
         features, preds = model.evaluate_image(img, False)  # No processing
-        pred = torch.exp(preds)
-        return pred
+        return torch.exp(preds)
 
+    @staticmethod
+    def predict_from_pil_rgb_image(model, pil_rgb_img):
+        img = ImageTools.transform_image(pil_rgb_img)  # Get the loaded images, resize in 224 and transformed in tensor
+        img = img.unsqueeze(0)  # To have a 4-dim tensor ([nb_of_images, channels, w, h])
+        return PredictTools.predict(model, img)
+
+    @staticmethod
     def compute_prob_and_class(pred):
         """ Retrieve class (success or fail) and its associated percentage from pred """
         prob, cl = torch.max(pred, 1)
