@@ -148,7 +148,7 @@ class InBoxCoord:
         self.bgr_cv = CvBridge().imgmsg_to_cv2(rgb_msg, desired_encoding='bgr8')
         self.depth_cv = CvBridge().imgmsg_to_cv2(depth_msg, desired_encoding='16UC1')
 
-    def is_picking_box_empty(self):
+    def is_picking_box_empty(self, req):
         dist_max = np.max(self.depth_cv).item()
         histogram = cv2.calcHist([self.depth_cv], [0], None, [dist_max], [1, dist_max])
         distance_camera_to_table = histogram.argmax()
