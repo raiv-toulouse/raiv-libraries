@@ -5,8 +5,8 @@ import rospy
 import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-from raiv_libraries.srv import get_coordservice, get_coordserviceResponse, get_coordserviceRequest
-from raiv_libraries.srv import BoxIsEmpty, BoxIsEmptyResponse
+from raiv_libraries.srv import get_coordservice, get_coordserviceResponse
+from raiv_libraries.srv import GetPickingBoxCentroid, GetPickingBoxCentroidResponse
 from raiv_libraries.srv import PickingBoxIsEmpty, PickingBoxIsEmptyResponse
 from raiv_camera_calibration.perspective_calibration import PerspectiveCalibration
 from raiv_libraries.image_tools import ImageTools
@@ -41,8 +41,8 @@ class InBoxCoord:
         self.distance_camera_to_table = 0
         rospy.Service('/In_box_coordService', get_coordservice, self.process_service)
         rospy.Service('/Is_Picking_Box_Empty', PickingBoxIsEmpty, self.is_picking_box_empty)
-        self.init_pick_and_place_boxes()
-        rospy.spin()
+        rospy.Service('/Get_picking_box_centroid', GetPickingBoxCentroid, self._get_picking_box_centroid)
+
 
     ###################################################################################################################
     # Initialisation methods
@@ -124,12 +124,17 @@ class InBoxCoord:
             self.angleleft = angle_box1
             self.rightbox = box2_pts
             self.angleright = angle_box2
+            moments = cv2.moments(box1contour)
         else:
             self.leftbox = box2_pts
             self.angleleft = angle_box2
             self.rightbox = box1_pts
             self.angleright = angle_box1
-
+            moments = cv2.moments(box1contour)
+        # Compute the centroid of the picking box
+        cx = int(moments['m10']/moments['m00'])
+        cy = int(moments['m01']/moments['m00'])
+        self.pick_box_centroid = (cx, cy)
         # if DEBUG:
         #     cv2.drawContours(imagergb, [self.leftbox], 0, (0, 255, 0), 3)
         #     cv2.drawContours(imagergb, [self.rightbox], 0, (255, 0, 0), 3)
@@ -138,8 +143,13 @@ class InBoxCoord:
 
 
     ###################################################################################################################
-    # Common methods
+    #  Common methods
     ###################################################################################################################
+
+    def _get_picking_box_centroid(self, req):
+        return GetPickingBoxCentroidResponse(x_centroid=self.pick_box_centroid[0],
+                                             y_centroid=self.pick_box_centroid[1],
+                                             z_centroid=0)
 
     # Function to refresh the RGB and Depth image
     def refresh_rgb_and_depth_images(self):
@@ -394,3 +404,7 @@ if __name__ == '__main__':
     rospy.init_node('In_box_coord')
     pc = PerspectiveCalibration('/common/save/calibration/camera/camera_data')
     IBC = InBoxCoord(pc)
+    IBC.init_pick_and_place_boxes()
+    rospy.spin()
+
+

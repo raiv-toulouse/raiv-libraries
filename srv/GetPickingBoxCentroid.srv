@@ -1,0 +1,4 @@
+---
+float64 x_centroid # Coordinates of picking box centroid (in meter)
+float64 y_centroid
+float64 z_centroid
