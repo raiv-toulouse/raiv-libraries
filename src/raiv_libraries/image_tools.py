@@ -118,7 +118,10 @@ class ImageTools:
             axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
             if files:
                 img_file = Image.open(files[i])
-                axs[1, i].imshow(np.asarray(img_file))
+                if img_file.mode == 'RGB':
+                    axs[1, i].imshow(np.asarray(img_file))
+                elif img_file.mode == 'L':  # Gray image => depth
+                    axs[1, i].imshow(np.asarray(img_file), cmap='gray', vmin=0, vmax=255)
                 axs[1, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
         plt.suptitle(title)
         plt.show()
