@@ -4,6 +4,9 @@ import cv2
 import numpy as np
 from cv_bridge import CvBridge
 from raiv_libraries.image_tools import ImageTools
+from raiv_libraries.robotUR import RobotUR
+import geometry_msgs.msg as geometry_msgs
+
 
 #TODO : Move in a constant file
 THRESHOLD_ABOVE_TABLE = 10  # Used to select all the pixels above the table
@@ -65,3 +68,6 @@ def generate_and_save_rgb_depth_images(resp_pick, parent_image_folder, is_object
         depth_images_pil.append(ImageTools.center_crop(pil_depth.rotate(deg), ImageTools.CROP_WIDTH, ImageTools.CROP_HEIGHT))
 
     save_pil_images(parent_image_folder, 'success' if is_object_gripped else 'fail', rgb_images_pil, depth_images_pil) # Save images in success folders
+
+def xyz_to_pose(x, y, z):
+    return geometry_msgs.Pose(geometry_msgs.Vector3(x, y, z), RobotUR.tool_down_pose)

@@ -14,6 +14,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 from torch.optim.optimizer import Optimizer
 from torchmetrics.functional import accuracy, precision, recall, confusion_matrix, f1_score, fbeta_score
 from raiv_libraries.image_tools import ImageTools
+from torchvision.models import ResNet18_Weights
 
 BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
 
@@ -107,20 +108,20 @@ def _unfreeze_and_add_param_group(module: Module,
 
 
 # --- PYTORCH LIGHTNING MODULE ----
-class DoubleCNN(pl.LightningModule):
+class CNN(pl.LightningModule):
 
     # defines the network
     def __init__(self,
+                 courbe_folder = None,
                  learning_rate: float = 1e-3,
                  batch_size: int = 8,
                  input_shape: list = [3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN],
                  backbone: str = 'resnet18',
                  train_bn: bool = True,
                  milestones: tuple = (5, 10),
-                 lr_scheduler_gamma: float = 1e-1,
-                 num_workers: int = 6):
+                 lr_scheduler_gamma: float = 1e-1):
 
-        super(DoubleCNN, self).__init__()
+        super(CNN, self).__init__()
         # parameters
         self.save_hyperparameters()
         self.dim = input_shape
@@ -131,70 +132,70 @@ class DoubleCNN(pl.LightningModule):
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.lr_scheduler_gamma = lr_scheduler_gamma
-        self.num_workers = num_workers
+        self.courbe_folder = courbe_folder
+        # self.lr = config["lr"]
+        # self.batch_size = config["batch_size"]
         # build the model
         self.__build_model()
-        # self.train_file = open('/common/data_courbes_matplotlib/DEPTH/150im_depth/train/data_model_TRAIN1.txt',
-        #                'w')  # fichier texte où sont stockées les données des graph (loss, accuracy etc...)
-        # self.val_file = open('/common/data_courbes_matplotlib/DEPTH/150im_depth/val/data_model_VAL1.txt', 'w')
-
-    def __build_features_layers(self, model_func):
-        """ Return the freezed layers of the pretrained CNN specified by model_func parameter."""
-        # Layers for the CNN part
-        # Load pre-trained network: choose the model for the pretrained network
-        backbone = model_func(pretrained=True)
-        _layers = list(backbone.children())[:-1]
-        feature_extractor = torch.nn.Sequential(*_layers)
-
-        # Freeze the CNN (no training for this part)
-        freeze(module=feature_extractor, n=-2, train_bn=self.train_bn)
-
-        # Add en adaptive layer:
-        adaptive_layer = torch.nn.AdaptiveAvgPool2d(output_size=(1, 1))
-        feature_extractor.add_module("adaptive_layer_rgb", adaptive_layer)
-
-        return feature_extractor
-
+        if courbe_folder is not None:
+            self.train_file = open(courbe_folder + '/train/data_model_train1.txt',
+                           'w')  # fichier texte où sont stockées les données des graph (loss, accuracy etc...)
+            self.val_file = open(courbe_folder + '/val/data_model_val1.txt', 'w')
 
     def __build_model(self):
-        """Define model layers & loss for RGB and Depth CNN"""
+        """Define model layers & loss."""
 
-        # Load pre-trained network: choose the model for the pretrained network
+        # 1. Load pre-trained network: choose the model for the pretrained network
         model_func = getattr(models, self.backbone)
+        backbone = model_func(weights=ResNet18_Weights.DEFAULT) #pretrained=True)
+        # self.feature_extractor = model_func(pretrained=True)
+        # print("BEFORE CUT")
+        # _layers = list(backbone.children())
+        # print(_layers)
+        # print("AFTER CUT")
+        _layers = list(backbone.children())[:-1]
+        # print(_layers)
+        self.feature_extractor = torch.nn.Sequential(*_layers)
+        # print(self.feature_extractor)
+        # If.eval() is used, then the layers are frozen.
+        # self.feature_extractor.eval()
+        # freeze(module=self.feature_extractor, train_bn=self.train_bn)
+        # si queremos descongelar últimas capas
+        #freeze(module=self.feature_extractor, n=-2, train_bn=self.train_bn)
+        # _unfreeze_and_add_param_group(
+        #     module=self.feature_extractor[:-2], optimizer=optimizer, train_bn=self.train_bn
+        #     )
 
-        self.feature_extractor_rgb = self.__build_features_layers(model_func)
-        self.feature_extractor_depth = self.__build_features_layers(model_func)
+        # 2. Adaptive layer:
+        self.adaptive_layer = torch.nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        self.feature_extractor.add_module("adaptive_layer", self.adaptive_layer)
+        # print(self.feature_extractor)
 
         # classes are two: success or failure
         num_target_classes = 2
-        n_sizes = self._get_conv_output(self.dim) * 2  # *2 because we add the RGB and depth features
+        n_sizes = self._get_conv_output(self.dim)
 
         # 3. Classifier
         _fc_layers = [torch.nn.Linear(n_sizes, 256),
                       torch.nn.Linear(256, 32),
                       torch.nn.Linear(32, num_target_classes)]
+        # self.fc = torch.nn.Sequential(*_fc_layers)
+        # _fc_layers = [nn.Linear(n_sizes, num_target_classes)]
         self.fc = torch.nn.Sequential(*_fc_layers)
 
         # 4. Loss:
         # self.loss_func = F.cross_entropy
 
     # mandatory
-    def forward(self, rgb, depth):
+    def forward(self, t):
         """Forward pass. Returns logits."""
-        # 1. Feature extraction for RGB CNN
-        rgb = self.feature_extractor_rgb(rgb)
-        features_rgb = rgb.squeeze(-1).squeeze(-1)
-
-        # 2. Feature extraction for Depth CNN
-        depth = self.feature_extractor_depth(depth)
-        features_depth = depth.squeeze(-1).squeeze(-1)
-
-        # 3. Concatenate both features
-        features = torch.cat((features_rgb, features_depth), dim=1)
-
-        # 4. Classifier (returns logits):
+        # 1. Feature extraction:
+        t = self.feature_extractor(t)
+        # print("t:", t.size())
+        features = t.squeeze(-1).squeeze(-1)
+        # print("Features", features.size())
+        # 2. Classifier (returns logits):
         t = self.fc(features)
-
         # We want the probability to sum 1
         t = F.log_softmax(t, dim=1)
         return features, t
@@ -203,8 +204,8 @@ class DoubleCNN(pl.LightningModule):
     # trainning loop
     def training_step(self, batch, batch_idx):
         # x = images , y = batch, logits = labels
-        rgb, depth, y, _ = batch
-        logits = self(rgb, depth)
+        x, y = batch
+        logits = self(x)
         # 2. Compute loss & metrics:
         return self._calculate_step_metrics(logits, y)
 
@@ -214,17 +215,17 @@ class DoubleCNN(pl.LightningModule):
         if self.current_epoch == 1:
             # sampleImg
             sampleImg = torch.rand((1, 3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN))
-            #self.logger.experiment.add_graph(DoubleCNN(), (sampleImg, sampleImg))
+            #BUG self.logger.experiment.add_graph(self, sampleImg)
         # logging histograms
         #self.custom_histogram_adder()
         # Calculate metrics
         loss_mean = self._calculate_epoch_metrics(outputs, name='Train')
-        print(f"Epoch {self.current_epoch} : training_epoch_end : loss_mean = ", loss_mean.item())
+        print(f"\nEpoch {self.current_epoch} : training_epoch_end : loss_mean = ", loss_mean.item())
 
     # validation loop
     def validation_step(self, batch, batch_idx):
-        rgb, depth, y, _ = batch
-        logits = self(rgb, depth)
+        x, y = batch
+        logits = self(x)
         # 2. Compute loss & metrics:
         outputs = self._calculate_step_metrics(logits, y)
         self.log("val_loss", outputs["loss"])
@@ -237,10 +238,20 @@ class DoubleCNN(pl.LightningModule):
 
     # test loop
     def test_step(self, batch, batch_idx):
-        rgb, depth, y, _ = batch
-        print('Shape of X', rgb.shape)
+        x, y = batch
+        print('Shape of X', x.shape)
         print('Shape of y', y.shape)
-        logits = self(rgb, depth)
+        nb_img = len(x)
+        for idx in np.arange(nb_img):
+            img = ImageTools.inv_trans(x[idx])
+            npimg = img.cpu().numpy()
+            npimg = npimg*256
+            npimgt = np.transpose(npimg, (1, 2, 0))
+            image_name = str(datetime.now()) + '_' + str(idx + 1) + '.png'
+            image_path = '/common/stockage_image_test/' + image_name
+            img_rgb = cv2.cvtColor(npimgt, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(image_path, img_rgb)
+        logits = self(x)
         # 2. Compute loss & metrics:
         return self._calculate_step_metrics(logits, y)
 
@@ -278,7 +289,7 @@ class DoubleCNN(pl.LightningModule):
 
     # returns the feature tensor from the conv block
     def _forward_features(self, x):
-        x = self.feature_extractor_rgb(x)
+        x = self.feature_extractor(x)
         # print("Size last_layer", x.size())
         return x
 
@@ -295,6 +306,7 @@ class DoubleCNN(pl.LightningModule):
         for name, params in self.named_parameters():
             self.logger.experiment.add_histogram(name, params, self.current_epoch)
 
+    # TODO: Refactor internal metrics
     def _calculate_step_metrics(self, logits, y):
         # prepare the metrics
         loss = self._loss_function(logits[1], y)
@@ -340,18 +352,20 @@ class DoubleCNN(pl.LightningModule):
                                  for output in outputs]).mean()
         recall = torch.stack([output['recall']
                               for output in outputs]).mean()
-        # Text writing
-        # if name == 'Train' :
-        #     txt = '\n' + str(self.current_epoch)
-        #     self.train_file.write(txt)
-        #     txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
-        #     self.train_file.write(txt2)
-        #
-        # if name == 'Val' :
-        #     txt = '\n' + str(self.current_epoch)
-        #     self.val_file.write(txt)
-        #     txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
-        #     self.val_file.write(txt2)
+
+        #Text writing
+        if self.courbe_folder:
+            if name == 'Train' :
+                txt = '\n' + str(self.current_epoch)
+                self.train_file.write(txt)
+                txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
+                self.train_file.write(txt2)
+
+            if name == 'Val' :
+                txt = '\n' + str(self.current_epoch)
+                self.val_file.write(txt)
+                txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
+                self.val_file.write(txt2)
 
         # Logging scalars
         self.logger.experiment.add_scalar(f'Loss/{name}',

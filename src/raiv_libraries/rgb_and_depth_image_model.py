@@ -62,7 +62,7 @@ class RgbAndDepthImageModel:
         logger = TensorBoardLogger('runs', name=f'Model_{self.model_name}')
         # write to tensorboard
         logger.experiment.add_image('test', grid)
-        logger.close()
+        #logger.close()
         # Load callbacks ########################################
         checkpoint_callback, early_stop_callback = self._config_callbacks()
         # Trainer  ################################################
@@ -72,7 +72,7 @@ class RgbAndDepthImageModel:
                              auto_lr_find=True,
                              logger=logger,
                              #deterministic=True,  Fail with bincount non deterministic operation
-                             progress_bar_refresh_rate=0,  # To remove the progress bar
+                             #progress_bar_refresh_rate=0,  # To remove the progress bar
                              #callbacks=[early_stop_callback, checkpoint_callback])
                              callbacks=[checkpoint_callback])
         # Config Hyperparameters ################################################
@@ -283,7 +283,7 @@ if __name__ == '__main__':
     parser.add_argument('ckpt_folder', type=str, help='folder path where to stock the model.CKPT file generated')
     args = parser.parse_args()
 
-    image_model = RgbAndDepthImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, num_epochs=2, dataset_size=None)
+    image_model = RgbAndDepthImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, num_epochs=15, dataset_size=None)
     start = time.time()
     image_model.call_trainer(data_dir_rgb=args.images_rgb_folder, data_dir_depth=args.images_depth_folder)  # Train model
     end = time.time()
