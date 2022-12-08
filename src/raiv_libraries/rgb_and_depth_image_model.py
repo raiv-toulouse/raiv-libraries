@@ -4,14 +4,11 @@ import os
 import torch
 import numpy as np
 import re
-import time
 import pytorch_lightning as pl
 import torchvision
-from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
-from torchvision import transforms
 from pytorch_lightning.loggers import TensorBoardLogger
-from raiv_libraries.double_CNN import DoubleCNN
+from raiv_libraries.double_CNN import Double_CNN
 from raiv_libraries.rgb_and_depth_image_data_module import RgbAndDepthImageDataModule
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
@@ -40,7 +37,7 @@ class RgbAndDepthImageModel:
         # Set a seed  ################################################
         #seed_everything(42)
         # Load model  ################################################
-        self.model = DoubleCNN(backbone=model_name)
+        self.model = Double_CNN(backbone=model_name)
         self.model_name = model_name
         # For getting the features for the image
         self.activation = {}
