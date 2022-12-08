@@ -20,7 +20,7 @@ class CNN(pl.LightningModule):
     # defines the network
     def __init__(self,
                  courbe_folder = None,
-                 learning_rate: float = 1e-3,
+                 learning_rate: float = 0.002,
                  batch_size: int = 8,
                  input_shape: list = [3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN],
                  backbone: str = 'resnet18',
@@ -51,6 +51,11 @@ class CNN(pl.LightningModule):
             self.val_file = open(courbe_folder + '/val/data_model_val1.txt', 'w')
 
 
+    # trainning loop
+    def training_step(self, batch, batch_idx):
+        logits, y = self.get_logits_and_outputs(batch)
+        # 2. Compute loss & metrics:
+        return self._calculate_step_metrics(logits, y)
 
     def training_epoch_end(self, outputs):
         """Compute and log training loss and accuracy at the epoch level."""
@@ -59,35 +64,41 @@ class CNN(pl.LightningModule):
             # sampleImg
             sampleImg = torch.rand((1, 3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN))
             #BUG self.logger.experiment.add_graph(self, sampleImg)
-        # logging histograms
-        #self.custom_histogram_adder()
         # Calculate metrics
         loss_mean = self._calculate_epoch_metrics(outputs, name='Train')
         print(f"\nEpoch {self.current_epoch} : training_epoch_end : loss_mean = ", loss_mean.item())
+
+    # validation loop
+    def validation_step(self, batch, batch_idx):
+        logits, y = self.get_logits_and_outputs(batch)
+        # 2. Compute loss & metrics:
+        outputs = self._calculate_step_metrics(logits, y)
+        self.log("val_loss", outputs["loss"])
+        return outputs
 
     def validation_epoch_end(self, outputs):
         """Compute and log validation loss and accuracy at the epoch level."""
         loss_mean = self._calculate_epoch_metrics(outputs, name='Val')
         print("==> validation_epoch_end : loss_mean = ", loss_mean.item())
 
+    # test loop
+    def test_step(self, batch, batch_idx):
+        logits, y = self.get_logits_and_outputs(batch)
+        # 2. Compute loss & metrics:
+        return self._calculate_step_metrics(logits, y)
+
     def test_epoch_end(self, outputs):
         loss_mean = self._calculate_epoch_metrics(outputs, name='Test')
         print("test_epoch_end : loss_mean = ", loss_mean.item())
 
-
     # define optimizers
     def configure_optimizers(self):
-        # optimizer2 = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
-        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate)
-        optimizer1 = torch.optim.SGD(self.parameters(), lr=0.002, momentum=0.9)
-        scheduler = MultiStepLR(optimizer, milestones=self.milestones, gamma=self.lr_scheduler_gamma)
+        #optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate)
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate, momentum=0.9)
         # Decay LR by a factor of 0.1 every 7 epochs
-        scheduler1 = lr_scheduler.StepLR(optimizer1, step_size=7, gamma=0.1)
-        # return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
         return (
-            # {'optimizer': optimizer1, 'lr_scheduler': scheduler1, 'monitor': 'metric_to_track'}
-            {'optimizer': optimizer1, 'lr_scheduler': scheduler1}
-            # {'optimizer': optimizer2, 'lr_scheduler': scheduler2},
+            {'optimizer': optimizer, 'lr_scheduler': scheduler}
         )
 
 

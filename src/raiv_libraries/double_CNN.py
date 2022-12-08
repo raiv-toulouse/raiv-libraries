@@ -57,30 +57,10 @@ class Double_CNN(CNN):
         t = F.log_softmax(t, dim=1)
         return features, t
 
-    # trainning loop
-    def training_step(self, batch, batch_idx):
-        # x = images , y = batch, logits = labels
+    def get_logits_and_outputs(self, batch):
         rgb, depth, y, _ = batch
         logits = self(rgb, depth)
-        # 2. Compute loss & metrics:
-        return self._calculate_step_metrics(logits, y)
+        return logits, y
 
-    # validation loop
-    def validation_step(self, batch, batch_idx):
-        rgb, depth, y, _ = batch
-        logits = self(rgb, depth)
-        # 2. Compute loss & metrics:
-        outputs = self._calculate_step_metrics(logits, y)
-        self.log("val_loss", outputs["loss"])
-        return outputs
-
-    # test loop
-    def test_step(self, batch, batch_idx):
-        rgb, depth, y, _ = batch
-        print('Shape of X', rgb.shape)
-        print('Shape of y', y.shape)
-        logits = self(rgb, depth)
-        # 2. Compute loss & metrics:
-        return self._calculate_step_metrics(logits, y)
 
 
