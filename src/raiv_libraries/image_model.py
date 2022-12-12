@@ -19,8 +19,6 @@ from pathlib import Path
 from raiv_libraries.image_tools import ImageTools
 import datetime
 
-from raiv_libraries.simple_CNN import Simple_CNN
-
 plt.switch_backend('Qt5Agg')
 torch.set_printoptions(linewidth=120)
 
@@ -45,7 +43,7 @@ class ImageModel:
         # Set a seed  ################################################
         # seed_everything(42)
         # Load model  ################################################
-        self.model = Simple_CNN(backbone=model_name, courbe_folder=courbe_folder)
+        self.model = CNN(backbone=model_name, courbe_folder=courbe_folder)
         self.model_name = model_name
         # For getting the features for the image
         self.activation = {}

@@ -1,26 +1,119 @@
 
 from typing import Generator
 import torch
+from datetime import datetime
+import numpy as np
+import cv2
 from torch.nn import Module
 import torch.nn.functional as F
 import pytorch_lightning as pl
+import torchvision.models as models
 from typing import Optional
 from torch.optim import lr_scheduler
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.optim.optimizer import Optimizer
 from torchmetrics.functional import accuracy, precision, recall, confusion_matrix, f1_score, fbeta_score
 from raiv_libraries.image_tools import ImageTools
-import torchvision.models as models
+from torchvision.models import ResNet18_Weights
+
+BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
+
+# --- UTILITY FUNCTIONS ----
+# Extract from :
+# https://github.com/PyTorchLightning/pytorch-lightning/blob/master/pl_examples/domain_templates/computer_vision_fine_tuning.py
+
+def _make_trainable(module: Module) -> None:
+    """Unfreezes a given module.
+    Args:
+        module: The module to unfreeze
+    """
+    for param in module.parameters():
+        param.requires_grad = True
+    module.train()
+
+
+def freeze(module: Module,
+           n: Optional[int] = None,
+           train_bn: bool = True) -> None:
+    """Freezes the layers up to index n (if n is not None).
+    Args:
+        module: The module to freeze (at least partially)
+        n: Max depth at which we stop freezing the layers. If None, all
+            the layers of the given module will be frozen.
+        train_bn: If True, leave the BatchNorm layers in training mode
+    """
+    children = list(module.children())
+    n_max = len(children) if n is None else int(n)
+
+    for child in children[:n_max]:
+        _recursive_freeze(module=child, train_bn=train_bn)
+
+    for child in children[n_max:]:
+        _make_trainable(module=child)
+
+
+def _recursive_freeze(module: Module,
+                      train_bn: bool = True) -> None:
+    """Freezes the layers of a given module.
+    Args:
+        module: The module to freeze
+        train_bn: If True, leave the BatchNorm layers in training mode
+    """
+    children = list(module.children())
+    if not children:
+        if not (isinstance(module, BN_TYPES) and train_bn):
+            for param in module.parameters():
+                param.requires_grad = False
+            module.eval()
+        else:
+            # Make the BN layers trainable
+            _make_trainable(module)
+    else:
+        for child in children:
+            _recursive_freeze(module=child, train_bn=train_bn)
+
+
+def filter_params(module: Module,
+                  train_bn: bool = True) -> Generator:
+    """Yields the trainable parameters of a given module.
+    Args:
+        module: A given module
+        train_bn: If True, leave the BatchNorm layers in training mode
+    Returns:
+        Generator
+    """
+    children = list(module.children())
+    if not children:
+        if not (isinstance(module, BN_TYPES) and train_bn):
+            for param in module.parameters():
+                if param.requires_grad:
+                    yield param
+    else:
+        for child in children:
+            for param in filter_params(module=child, train_bn=train_bn):
+                yield param
+
+
+def _unfreeze_and_add_param_group(module: Module,
+                                  optimizer: Optimizer,
+                                  lr: Optional[float] = None,
+                                  train_bn: bool = True):
+    """Unfreezes a module and adds its parameters to an optimizer."""
+    _make_trainable(module)
+    params_lr = optimizer.param_groups[0]['lr'] if lr is None else float(lr)
+    optimizer.add_param_group(
+        {'params': filter_params(module=module, train_bn=train_bn),
+         'lr': params_lr / 10.,
+         })
 
 
 # --- PYTORCH LIGHTNING MODULE ----
 class CNN(pl.LightningModule):
-    BN_TYPES = (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)
 
     # defines the network
     def __init__(self,
                  courbe_folder = None,
-                 learning_rate: float = 0.002,
+                 learning_rate: float = 1e-3,
                  batch_size: int = 8,
                  input_shape: list = [3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN],
                  backbone: str = 'resnet18',
@@ -30,7 +123,7 @@ class CNN(pl.LightningModule):
 
         super(CNN, self).__init__()
         # parameters
-        # self.save_hyperparameters()
+        self.save_hyperparameters()
         self.dim = input_shape
         # 'vgg16', 'resnet50', 'alexnet', 'resnet18', 'resnet34', 'squeezenet1_1', 'googlenet'
         self.backbone = backbone
@@ -40,20 +133,79 @@ class CNN(pl.LightningModule):
         self.learning_rate = learning_rate
         self.lr_scheduler_gamma = lr_scheduler_gamma
         self.courbe_folder = courbe_folder
-        self.feature_extractors = []
         # self.lr = config["lr"]
         # self.batch_size = config["batch_size"]
         # build the model
-        #self.build_model()
+        self.__build_model()
         if courbe_folder is not None:
             self.train_file = open(courbe_folder + '/train/data_model_train1.txt',
                            'w')  # fichier texte où sont stockées les données des graph (loss, accuracy etc...)
             self.val_file = open(courbe_folder + '/val/data_model_val1.txt', 'w')
 
+    def __build_model(self):
+        """Define model layers & loss."""
+
+        # 1. Load pre-trained network: choose the model for the pretrained network
+        model_func = getattr(models, self.backbone)
+        backbone = model_func(weights=ResNet18_Weights.DEFAULT) #pretrained=True)
+        # self.feature_extractor = model_func(pretrained=True)
+        # print("BEFORE CUT")
+        # _layers = list(backbone.children())
+        # print(_layers)
+        # print("AFTER CUT")
+        _layers = list(backbone.children())[:-1]
+        # print(_layers)
+        self.feature_extractor = torch.nn.Sequential(*_layers)
+        # print(self.feature_extractor)
+        # If.eval() is used, then the layers are frozen.
+        # self.feature_extractor.eval()
+        # freeze(module=self.feature_extractor, train_bn=self.train_bn)
+        # si queremos descongelar últimas capas
+        #freeze(module=self.feature_extractor, n=-2, train_bn=self.train_bn)
+        # _unfreeze_and_add_param_group(
+        #     module=self.feature_extractor[:-2], optimizer=optimizer, train_bn=self.train_bn
+        #     )
+
+        # 2. Adaptive layer:
+        self.adaptive_layer = torch.nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        self.feature_extractor.add_module("adaptive_layer", self.adaptive_layer)
+        # print(self.feature_extractor)
+
+        # classes are two: success or failure
+        num_target_classes = 2
+        n_sizes = self._get_conv_output(self.dim)
+
+        # 3. Classifier
+        _fc_layers = [torch.nn.Linear(n_sizes, 256),
+                      torch.nn.Linear(256, 32),
+                      torch.nn.Linear(32, num_target_classes)]
+        # self.fc = torch.nn.Sequential(*_fc_layers)
+        # _fc_layers = [nn.Linear(n_sizes, num_target_classes)]
+        self.fc = torch.nn.Sequential(*_fc_layers)
+
+        # 4. Loss:
+        # self.loss_func = F.cross_entropy
+
+    # mandatory
+    def forward(self, t):
+        """Forward pass. Returns logits."""
+        # 1. Feature extraction:
+        t = self.feature_extractor(t)
+        # print("t:", t.size())
+        features = t.squeeze(-1).squeeze(-1)
+        # print("Features", features.size())
+        # 2. Classifier (returns logits):
+        t = self.fc(features)
+        # We want the probability to sum 1
+        t = F.log_softmax(t, dim=1)
+        return features, t
+
 
     # trainning loop
     def training_step(self, batch, batch_idx):
-        logits, y = self.get_logits_and_outputs(batch)
+        # x = images , y = batch, logits = labels
+        x, y = batch
+        logits = self(x)
         # 2. Compute loss & metrics:
         return self._calculate_step_metrics(logits, y)
 
@@ -64,13 +216,16 @@ class CNN(pl.LightningModule):
             # sampleImg
             sampleImg = torch.rand((1, 3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN))
             #BUG self.logger.experiment.add_graph(self, sampleImg)
+        # logging histograms
+        #self.custom_histogram_adder()
         # Calculate metrics
         loss_mean = self._calculate_epoch_metrics(outputs, name='Train')
         print(f"\nEpoch {self.current_epoch} : training_epoch_end : loss_mean = ", loss_mean.item())
 
     # validation loop
     def validation_step(self, batch, batch_idx):
-        logits, y = self.get_logits_and_outputs(batch)
+        x, y = batch
+        logits = self(x)
         # 2. Compute loss & metrics:
         outputs = self._calculate_step_metrics(logits, y)
         self.log("val_loss", outputs["loss"])
@@ -83,7 +238,20 @@ class CNN(pl.LightningModule):
 
     # test loop
     def test_step(self, batch, batch_idx):
-        logits, y = self.get_logits_and_outputs(batch)
+        x, y = batch
+        print('Shape of X', x.shape)
+        print('Shape of y', y.shape)
+        nb_img = len(x)
+        for idx in np.arange(nb_img):
+            img = ImageTools.inv_trans(x[idx])
+            npimg = img.cpu().numpy()
+            npimg = npimg*256
+            npimgt = np.transpose(npimg, (1, 2, 0))
+            image_name = str(datetime.now()) + '_' + str(idx + 1) + '.png'
+            image_path = '/common/stockage_image_test/' + image_name
+            img_rgb = cv2.cvtColor(npimgt, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(image_path, img_rgb)
+        logits = self(x)
         # 2. Compute loss & metrics:
         return self._calculate_step_metrics(logits, y)
 
@@ -93,27 +261,37 @@ class CNN(pl.LightningModule):
 
     # define optimizers
     def configure_optimizers(self):
-        #optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate)
-        optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate, momentum=0.9)
+        # optimizer2 = torch.optim.Adam(self.feature_extractor.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate)
+        optimizer1 = torch.optim.SGD(self.parameters(), lr=0.002, momentum=0.9)
+        scheduler = MultiStepLR(optimizer, milestones=self.milestones, gamma=self.lr_scheduler_gamma)
         # Decay LR by a factor of 0.1 every 7 epochs
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+        scheduler1 = lr_scheduler.StepLR(optimizer1, step_size=7, gamma=0.1)
+        # return torch.optim.SGD(self.feature_extractor.parameters(), lr=self.learning_rate, momentum=0.9)
         return (
-            {'optimizer': optimizer, 'lr_scheduler': scheduler}
+            # {'optimizer': optimizer1, 'lr_scheduler': scheduler1, 'monitor': 'metric_to_track'}
+            {'optimizer': optimizer1, 'lr_scheduler': scheduler1}
+            # {'optimizer': optimizer2, 'lr_scheduler': scheduler2},
         )
 
 
-    def get_cumulative_output_conv_layers_size(self):
-        """
-        Return the cumulative size of all the output convolution layers which is the input size for the dense part
-        """
+    # returns the size of the output tensor going into the Linear layer from the conv block.
+    def _get_conv_output(self, shape):
         batch_size = 1
-        input = torch.autograd.Variable(torch.rand(batch_size, *self.dim))
-        size = 0
-        for feature_extractor in self.feature_extractors:
-            output_feat = feature_extractor(input) # returns the feature tensor from the conv block
-            n_size = output_feat.data.view(batch_size, -1).size(1)  #the size of the output tensor going into the Linear layer from the conv block
-            size += n_size
-        return size
+        input = torch.autograd.Variable(torch.rand(batch_size, *shape))
+        output_feat = self._forward_features(input)
+        n_size = output_feat.data.view(batch_size, -1).size(1)
+        return n_size
+
+    def get_size(self):
+        n_sizes = self._get_conv_output(self.dim)
+        return n_sizes
+
+    # returns the feature tensor from the conv block
+    def _forward_features(self, x):
+        x = self.feature_extractor(x)
+        # print("Size last_layer", x.size())
+        return x
 
     # loss function, weights modified to give more importance to class 1
     @staticmethod
@@ -128,6 +306,7 @@ class CNN(pl.LightningModule):
         for name, params in self.named_parameters():
             self.logger.experiment.add_histogram(name, params, self.current_epoch)
 
+    # TODO: Refactor internal metrics
     def _calculate_step_metrics(self, logits, y):
         # prepare the metrics
         loss = self._loss_function(logits[1], y)
@@ -173,19 +352,20 @@ class CNN(pl.LightningModule):
                                  for output in outputs]).mean()
         recall = torch.stack([output['recall']
                               for output in outputs]).mean()
-        # Text writing
-        #  if self.courbe_folder:
-        # if name == 'Train' :
-        #     txt = '\n' + str(self.current_epoch)
-        #     self.train_file.write(txt)
-        #     txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
-        #     self.train_file.write(txt2)
-        #
-        # if name == 'Val' :
-        #     txt = '\n' + str(self.current_epoch)
-        #     self.val_file.write(txt)
-        #     txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
-        #     self.val_file.write(txt2)
+
+        #Text writing
+        if self.courbe_folder:
+            if name == 'Train' :
+                txt = '\n' + str(self.current_epoch)
+                self.train_file.write(txt)
+                txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
+                self.train_file.write(txt2)
+
+            if name == 'Val' :
+                txt = '\n' + str(self.current_epoch)
+                self.val_file.write(txt)
+                txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
+                self.val_file.write(txt2)
 
         # Logging scalars
         self.logger.experiment.add_scalar(f'Loss/{name}',
@@ -212,128 +392,3 @@ class CNN(pl.LightningModule):
                                           recall,
                                           self.current_epoch)
         return loss_mean
-
-
-    def build_model(self, feature_extractor_names):
-        """Define model layers & loss for RGB and Depth CNN"""
-
-        # Load pre-trained network: choose the model for the pretrained network
-        model_func = getattr(models, self.backbone)
-
-        for feature_extractor_name in feature_extractor_names:
-            self.feature_extractors.append(self._build_features_layers(model_func, feature_extractor_name))  # For RGB part
-
-        # classes are two: success or failure
-        num_target_classes = 2
-        n_sizes = self.get_cumulative_output_conv_layers_size()  # RGB and depth features
-
-        # 3. Classifier
-        _fc_layers = [torch.nn.Linear(n_sizes, 256),
-                      torch.nn.Linear(256, 32),
-                      torch.nn.Linear(32, num_target_classes)]
-        return torch.nn.Sequential(*_fc_layers)
-
-    def _build_features_layers(self, model_func, layer_name):
-        """ Return the freezed layers of the pretrained CNN specified by model_func parameter."""
-        # Layers for the CNN part
-        # Load pre-trained network: choose the model for the pretrained network
-        backbone = model_func(pretrained=True)
-        _layers = list(backbone.children())[:-1]
-        feature_extractor = torch.nn.Sequential(*_layers)
-
-        # Freeze the CNN (no training for this part)
-        self.freeze(feature_extractor, n=-2, train_bn=self.train_bn)
-
-        # Add en adaptive layer:
-        adaptive_layer = torch.nn.AdaptiveAvgPool2d(output_size=(1, 1))
-        feature_extractor.add_module("adaptive_layer_"+layer_name, adaptive_layer)
-
-        return feature_extractor
-
-    # --- UTILITY FUNCTIONS ----
-    # Extract from :
-    # https://github.com/PyTorchLightning/pytorch-lightning/blob/master/pl_examples/domain_templates/computer_vision_fine_tuning.py
-
-    def _make_trainable(self, module: Module) -> None:
-        """Unfreezes a given module.
-        Args:
-            module: The module to unfreeze
-        """
-        for param in module.parameters():
-            param.requires_grad = True
-        module.train()
-
-
-    def freeze(self, module: Module,
-               n: Optional[int] = None,
-               train_bn: bool = True) -> None:
-        """Freezes the layers up to index n (if n is not None).
-        Args:
-            module: The module to freeze (at least partially)
-            n: Max depth at which we stop freezing the layers. If None, all
-                the layers of the given module will be frozen.
-            train_bn: If True, leave the BatchNorm layers in training mode
-        """
-        children = list(module.children())
-        n_max = len(children) if n is None else int(n)
-
-        for child in children[:n_max]:
-            self._recursive_freeze(module=child, train_bn=train_bn)
-
-        for child in children[n_max:]:
-            self._make_trainable(module=child)
-
-
-    def _recursive_freeze(self, module: Module,
-                          train_bn: bool = True) -> None:
-        """Freezes the layers of a given module.
-        Args:
-            module: The module to freeze
-            train_bn: If True, leave the BatchNorm layers in training mode
-        """
-        children = list(module.children())
-        if not children:
-            if not (isinstance(module, CNN.BN_TYPES) and train_bn):
-                for param in module.parameters():
-                    param.requires_grad = False
-                module.eval()
-            else:
-                # Make the BN layers trainable
-                self._make_trainable(module)
-        else:
-            for child in children:
-                self._recursive_freeze(module=child, train_bn=train_bn)
-
-
-    def filter_params(self, module: Module,
-                      train_bn: bool = True) -> Generator:
-        """Yields the trainable parameters of a given module.
-        Args:
-            module: A given module
-            train_bn: If True, leave the BatchNorm layers in training mode
-        Returns:
-            Generator
-        """
-        children = list(module.children())
-        if not children:
-            if not (isinstance(module, CNN.BN_TYPES) and train_bn):
-                for param in module.parameters():
-                    if param.requires_grad:
-                        yield param
-        else:
-            for child in children:
-                for param in self.filter_params(module=child, train_bn=train_bn):
-                    yield param
-
-
-    def _unfreeze_and_add_param_group(self, module: Module,
-                                      optimizer: Optimizer,
-                                      lr: Optional[float] = None,
-                                      train_bn: bool = True):
-        """Unfreezes a module and adds its parameters to an optimizer."""
-        self._make_trainable(module)
-        params_lr = optimizer.param_groups[0]['lr'] if lr is None else float(lr)
-        optimizer.add_param_group(
-            {'params': self.filter_params(module=module, train_bn=train_bn),
-             'lr': params_lr / 10.,
-             })
