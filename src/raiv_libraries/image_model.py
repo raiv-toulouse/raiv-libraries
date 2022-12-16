@@ -11,7 +11,8 @@ from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from torchvision import transforms
 from pytorch_lightning.loggers import TensorBoardLogger
-from raiv_libraries.CNN import CNN
+from raiv_libraries.simple_CNN import Simple_CNN
+#from raiv_libraries.CNN import CNN
 from raiv_libraries.image_data_module import ImageDataModule
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
@@ -43,7 +44,7 @@ class ImageModel:
         # Set a seed  ################################################
         # seed_everything(42)
         # Load model  ################################################
-        self.model = CNN(backbone=model_name, courbe_folder=courbe_folder)
+        self.model = Simple_CNN(backbone=model_name, courbe_folder=courbe_folder)
         self.model_name = model_name
         # For getting the features for the image
         self.activation = {}
@@ -80,6 +81,7 @@ class ImageModel:
                              auto_select_gpus=False,
                              auto_lr_find=True,
                              logger=logger,
+                             log_every_n_steps=10,
                              #deterministic=True,  Fail with bincount non deterministic operation
                              #callbacks=[early_stop_callback, checkpoint_callback])
                              callbacks=[checkpoint_callback])
@@ -89,9 +91,9 @@ class ImageModel:
         # Train model ################################################
         start_fit = time.time()
         trainer.fit(model=self.model, datamodule=self.image_module)
-        print("Training duration = {} s", time.time()-start_fit)
+        print(f"Training duration = {time.time()-start_fit:.2f} s")
         # Test  ################################################
-        trainer.test(datamodule=self.image_module)
+        trainer.test(ckpt_path='best', datamodule=self.image_module)
 
 
     # Returns the size of features tensor
@@ -299,5 +301,5 @@ if __name__ == '__main__':
     start = time.time()
     image_model.call_trainer(data_dir=args.images_folder)  # Train model
     end = time.time()
-    print("Elapsed time = ", end-start, " seconds")
+    print(f"Elapsed time = {end-start:.2f} seconds")
     print('End of model training')
