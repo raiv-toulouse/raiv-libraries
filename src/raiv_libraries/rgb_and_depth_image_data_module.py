@@ -1,36 +1,25 @@
-# import libraries
-
-from collections import Counter
-import numpy as np
-import matplotlib.pyplot as plt
-import os
-import torchvision
-import torchvision.datasets as datasets
 import torch
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, random_split, Subset, WeightedRandomSampler
-from raiv_libraries.image_tools import ImageTools
 from raiv_libraries.image_dataset_rgb_depth import ImageDatasetRgbDepth
+from raiv_libraries.image_tools import ImageTools
+
 
 class RgbAndDepthImageDataModule(pl.LightningDataModule):
 
-    def __init__(self, data_dir_rgb, data_dir_depth, batch_size, dataset_size=None):
+    def __init__(self, data_dir_rgb, data_dir_depth, batch_size=8, dataset_size=None):
         super().__init__()
         self.dataset = ImageDatasetRgbDepth(data_dir_rgb, data_dir_depth)
         self.batch_size = batch_size
 
-
     def setup(self, stage=None):
-
         train_size = int(0.7 * len(self.dataset))
         val_size = int(0.5 * (len(self.dataset) - train_size))
         test_size = int(len(self.dataset) - train_size - val_size)
         train_set, val_set, test_set = random_split(self.dataset, (train_size, val_size, test_size))
-
         self.train_data = TransformSubset(train_set, transform=ImageTools.transform)  # No augmentation because it doesn't apply the same random transform to RGB and Depth images
         self.val_data = TransformSubset(val_set, transform=ImageTools.transform)
         self.test_data = TransformSubset(test_set, transform=ImageTools.transform)
-
 
     def train_dataloader(self):
         train_loader = torch.utils.data.DataLoader(self.train_data, num_workers=16, batch_size=self.batch_size)

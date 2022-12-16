@@ -1,13 +1,12 @@
 import torch
 import torch.nn.functional as F
 import torchvision.models as models
-from raiv_libraries.CNN import CNN
-from torchvision.models import ResNet18_Weights
+from raiv_libraries.cnn import Cnn
 
 
-class Double_CNN(CNN):
+class RgbAndDepthCnn(Cnn):
     def __init__(self, **kwargs):
-        super(Double_CNN, self).__init__(**kwargs)
+        super(RgbAndDepthCnn, self).__init__(**kwargs)
 
     def build_model(self):
         """Define model layers """
@@ -26,7 +25,7 @@ class Double_CNN(CNN):
         self.fc = torch.nn.Sequential(*_fc_layers)
 
     def _build_features_layers(self, model_func):
-        """ Return the feature extractor from a pretrained CNN """
+        """ Return the feature extractor from a pretrained Cnn """
         backbone = model_func(weights="DEFAULT")
         # Feature extractor
         _layers = list(backbone.children())[:-1]
@@ -34,10 +33,10 @@ class Double_CNN(CNN):
 
     def forward(self, rgb, depth):
         """Forward pass. Returns logits."""
-        # 1. Feature extraction for RGB CNN
+        # 1. Feature extraction for RGB Cnn
         features_rgb = self.feature_extractor_rgb(rgb)
         features_rgb = features_rgb.squeeze(-1).squeeze(-1)
-        # 2. Feature extraction for Depth CNN
+        # 2. Feature extraction for Depth Cnn
         features_depth = self.feature_extractor_rgb(depth)
         features_depth = features_depth.squeeze(-1).squeeze(-1)
         # 3. Concatenate both features

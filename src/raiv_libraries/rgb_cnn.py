@@ -1,13 +1,13 @@
 import torch
 import torch.nn.functional as F
 import torchvision.models as models
-from raiv_libraries.CNN import CNN
+from raiv_libraries.cnn import Cnn
 
 
-class Simple_CNN(CNN):
+class RgbCnn(Cnn):
 
     def __init__(self, **kwargs):
-        super(Simple_CNN, self).__init__(**kwargs)
+        super(RgbCnn, self).__init__(**kwargs)
 
     def build_model(self):
         """ Define model layers """

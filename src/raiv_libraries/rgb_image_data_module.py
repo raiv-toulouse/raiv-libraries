@@ -1,5 +1,3 @@
-# import libraries
-
 from collections import Counter
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,12 +8,11 @@ import torch
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, random_split, Subset, WeightedRandomSampler
 from raiv_libraries.image_tools import ImageTools
-import cv2
 
 
-class ImageDataModule(pl.LightningDataModule):
+class RgbImageDataModule(pl.LightningDataModule):
 
-    def __init__(self, data_dir, batch_size, dataset_size=None, num_workers=8):
+    def __init__(self, data_dir, batch_size=8, dataset_size=None, num_workers=8):
         super().__init__()
         self.trains_dims = None
         self.batch_size = batch_size
@@ -156,7 +153,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dataset_size', default=None, type=int, help='Optionnal number of images for the dataset size')
     args = parser.parse_args()
 
-    image_module = ImageDataModule(data_dir=args.images_folder, batch_size=8, num_workers=8, dataset_size=args.dataset_size)
+    image_module = RgbImageDataModule(data_dir=args.images_folder, batch_size=8, num_workers=8, dataset_size=args.dataset_size)
     image_module.setup()
 
     if args.test_num_workers:

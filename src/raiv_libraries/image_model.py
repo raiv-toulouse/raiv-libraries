@@ -1,19 +1,12 @@
-# import libraries
-
 import os
+import time
 import torch
 import numpy as np
 import re
-import time
 import pytorch_lightning as pl
 import torchvision
-from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
-from torchvision import transforms
 from pytorch_lightning.loggers import TensorBoardLogger
-from raiv_libraries.simple_CNN import Simple_CNN
-#from raiv_libraries.CNN import CNN
-from raiv_libraries.image_data_module import ImageDataModule
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from pathlib import Path
@@ -26,26 +19,23 @@ torch.set_printoptions(linewidth=120)
 
 class ImageModel:
     def __init__(self,
+                 model,
+                 data_module,
                  model_name,
                  ckpt_dir,
-                 courbe_folder=None,
                  dataset_size=None,
-                 batch_size=8,
                  num_epochs=20,
                  img_size=ImageTools.IMAGE_SIZE_FOR_NN,
                  fine_tuning=True,
                  suffix=''):
         super(ImageModel, self).__init__()
         # Parameters
-        self.batch_size = batch_size
+        self.model = model
+        self.data_module = data_module
+        self.model_name = model_name
         self.num_epochs = num_epochs
         self.img_size = img_size
         self.dataset_size = dataset_size
-        # Set a seed  ################################################
-        # seed_everything(42)
-        # Load model  ################################################
-        self.model = Simple_CNN(backbone=model_name, courbe_folder=courbe_folder)
-        self.model_name = model_name
         # For getting the features for the image
         self.activation = {}
         # Save the model after every epoch by monitoring a quantity.
@@ -60,12 +50,11 @@ class ImageModel:
         # Flag for feature extracting. When False, we finetune the whole model,when True we only update the reshaped
         self.fine_tuning = fine_tuning
 
-    def call_trainer(self, data_dir):
-        self.image_module = ImageDataModule(data_dir, batch_size=self.batch_size, dataset_size=self.dataset_size)
+    def call_trainer(self):
         # Load images  ################################################
-        self.image_module.setup()
+        self.data_module.setup()
         # Samples required by the custom ImagePredictionLogger callback to log image predictions.
-        val_samples = next(iter(self.image_module.val_dataloader()))
+        val_samples = next(iter(self.data_module.val_dataloader()))
         #ImageTools.show_image(val_samples[0])  # ImageTools.show_image(val_samples[0][0]) to show only the first iamge (not all images in the batch
         grid = ImageTools.inv_trans(torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2))
         # Tensorboard Logger used
@@ -90,16 +79,12 @@ class ImageModel:
         # self._tune_model(trainer)
         # Train model ################################################
         start_fit = time.time()
-        trainer.fit(model=self.model, datamodule=self.image_module)
+        trainer.fit(model=self.model, datamodule=self.data_module)
         print(f"Training duration = {time.time()-start_fit:.2f} s")
         # Test  ################################################
-        trainer.test(ckpt_path='best', datamodule=self.image_module)
+        trainer.test(ckpt_path='best', datamodule=self.data_module)
 
 
-    # Returns the size of features tensor
-    def get_size_features(self, model):
-        feature_size = model.get_size()
-        return feature_size
 
     @torch.no_grad()
     def evaluate_image(self, image, with_processing=True):
@@ -274,32 +259,3 @@ class ImageModel:
         # preds = np.squeeze(preds_tensor.cpu().numpy())  CAusait une erreur quand il n'y avait qu'une seule image
         preds = preds_tensor.cpu().numpy()
         return preds, [F.softmax(el, dim=0)[i].item() for i, el in zip(preds, output[1])]
-
-
-
-# Train a CNN.
-# Use a ImageDataModule to load the images located in the specified train and val folders
-# The resulting model will be stored in a file which name looks like this : model-epoch=01-val_loss=0.62.ckpt
-# and which is located in '<ckpt_folder>/model/<model name>' like 'model/resnet50'
-# To view the logs : tensorboard --logdir=runs
-
-# --- MAIN ----
-if __name__ == '__main__':
-    import argparse
-    import time
-
-    parser = argparse.ArgumentParser(description='Train a CNN with images from specified images folder. View results with : tensorboard --logdir=runs')
-    parser.add_argument('images_folder', type=str, help='images folder with fail and success sub-folders')
-    parser.add_argument('ckpt_folder', type=str, help='folder path where to stock the model.CKPT file generated')
-    parser.add_argument('-c', '--courbe_path', default=None, type=str, help='Optionnal path folder .txt where the informations of the model will be stocked for courbes_CNN.py')
-    parser.add_argument('-s', '--suffix_name', default='', type=str, help='Optionnal suffix to add to the model name')
-    parser.add_argument('-e', '--epochs', default=15, type=int, help='Optionnal number of epochs')
-    parser.add_argument('-d', '--dataset_size', default=None, type=int, help='Optionnal number of images for the dataset size')
-    args = parser.parse_args()
-
-    image_model = ImageModel(model_name='resnet18', ckpt_dir=args.ckpt_folder, courbe_folder=args.courbe_path, num_epochs=args.epochs, dataset_size=args.dataset_size, suffix=args.suffix_name)
-    start = time.time()
-    image_model.call_trainer(data_dir=args.images_folder)  # Train model
-    end = time.time()
-    print(f"Elapsed time = {end-start:.2f} seconds")
-    print('End of model training')

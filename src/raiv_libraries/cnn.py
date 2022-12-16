@@ -2,12 +2,12 @@ import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
 from torch.optim import lr_scheduler
-from torchmetrics.functional import accuracy, precision, recall, confusion_matrix, f1_score, fbeta_score
+from torchmetrics.functional import accuracy, confusion_matrix, f1_score
 from raiv_libraries.image_tools import ImageTools
 
 
 # --- PYTORCH LIGHTNING MODULE ----
-class CNN(pl.LightningModule):
+class Cnn(pl.LightningModule):
 
     def __init__(self,
                  courbe_folder=None,
@@ -18,7 +18,7 @@ class CNN(pl.LightningModule):
                  train_bn: bool = True,
                  milestones: tuple = (5, 10),
                  lr_scheduler_gamma: float = 1e-1):
-        super(CNN, self).__init__()
+        super(Cnn, self).__init__()
         self.save_hyperparameters()
         self.build_model()
         if courbe_folder is not None:
