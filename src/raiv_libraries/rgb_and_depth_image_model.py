@@ -1,9 +1,4 @@
-from raiv_libraries.rgb_and_depth_cnn import RgbAndDepthCnn
-from raiv_libraries.rgb_and_depth_image_data_module import RgbAndDepthImageDataModule
-from raiv_libraries.image_model import ImageModel
-
-
-# Train a Cnn.
+# Train a double CNN for RGB and depth images.
 # Use a ImageDataModule to load the images located in the specified train and val folders
 # The resulting model will be stored in a file which name looks like this : model-epoch=01-val_loss=0.62.ckpt
 # and which is located in '<ckpt_folder>/model/<model name>' like 'model/resnet50'
@@ -11,6 +6,10 @@ from raiv_libraries.image_model import ImageModel
 
 # --- MAIN ----
 if __name__ == '__main__':
+    from raiv_libraries.rgb_and_depth_cnn import RgbAndDepthCnn
+    from raiv_libraries.image_data_module import ImageDataModule, RgbAndDepthSubset
+    from raiv_libraries.rgb_and_depth_image_dataset import RgbAndDepthImageDataset
+    from raiv_libraries.image_model import ImageModel
     import argparse
     import time
 
@@ -27,9 +26,10 @@ if __name__ == '__main__':
     # Build the model
     model_name = 'resnet18'
     model = RgbAndDepthCnn(backbone=model_name, courbe_folder=args.courbe_path)
-    # Build the DataModule
-    data_module = RgbAndDepthImageDataModule(data_dir_rgb=args.images_rgb_folder, data_dir_depth=args.images_depth_folder, dataset_size=args.dataset_size)
-    # Now,
+    # Build the dataset and the DataModule
+    dataset = RgbAndDepthImageDataset(args.images_rgb_folder, args.images_depth_folder)
+    data_module = ImageDataModule(dataset, RgbAndDepthSubset, dataset_size=args.dataset_size)
+    # Now, we can build he ImageModel
     rgb_and_depth_image_model = ImageModel(model=model, data_module=data_module, model_name=model_name, ckpt_dir=args.ckpt_folder, num_epochs=args.epochs, suffix=args.suffix_name)
     start = time.time()
     rgb_and_depth_image_model.call_trainer()  # Train model

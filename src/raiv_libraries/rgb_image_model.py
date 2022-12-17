@@ -1,9 +1,4 @@
-from raiv_libraries.rgb_cnn import RgbCnn
-from raiv_libraries.rgb_image_data_module import RgbImageDataModule
-from raiv_libraries.image_model import ImageModel
-
-
-# Train a Cnn.
+# Train a CNN for RGB images.
 # Use a ImageDataModule to load the images located in the specified train and val folders
 # The resulting model will be stored in a file which name looks like this : model-epoch=01-val_loss=0.62.ckpt
 # and which is located in '<ckpt_folder>/model/<model name>' like 'model/resnet50'
@@ -11,6 +6,10 @@ from raiv_libraries.image_model import ImageModel
 
 # --- MAIN ----
 if __name__ == '__main__':
+    from raiv_libraries.rgb_cnn import RgbCnn
+    from raiv_libraries.image_data_module import ImageDataModule, RgbSubset
+    from raiv_libraries.image_model import ImageModel
+    import torchvision.datasets as datasets
     import argparse
     import time
 
@@ -27,8 +26,9 @@ if __name__ == '__main__':
     model_name = 'resnet18'
     model = RgbCnn(backbone=model_name, courbe_folder=args.courbe_path)
     # Build the DataModule
-    data_module = RgbImageDataModule(data_dir=args.images_folder, dataset_size=args.dataset_size)
-    # Now,
+    dataset = datasets.ImageFolder(args.images_folder)
+    data_module = ImageDataModule(dataset, RgbSubset, dataset_size=args.dataset_size)
+    # Now, we can build he ImageModel
     rgb_image_model = ImageModel(model=model, data_module=data_module, model_name=model_name, ckpt_dir=args.ckpt_folder, num_epochs=args.epochs, suffix=args.suffix_name)
     start = time.time()
     rgb_image_model.call_trainer()  # Train model

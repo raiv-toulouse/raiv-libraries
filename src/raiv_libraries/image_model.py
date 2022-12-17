@@ -51,8 +51,6 @@ class ImageModel:
         self.fine_tuning = fine_tuning
 
     def call_trainer(self):
-        # Load images  ################################################
-        self.data_module.setup()
         # Samples required by the custom ImagePredictionLogger callback to log image predictions.
         val_samples = next(iter(self.data_module.val_dataloader()))
         #ImageTools.show_image(val_samples[0])  # ImageTools.show_image(val_samples[0][0]) to show only the first iamge (not all images in the batch
@@ -84,8 +82,6 @@ class ImageModel:
         # Test  ################################################
         trainer.test(ckpt_path='best', datamodule=self.data_module)
 
-
-
     @torch.no_grad()
     def evaluate_image(self, image, with_processing=True):
         if with_processing:
@@ -94,7 +90,6 @@ class ImageModel:
             image_tensor = image
         features, prediction = self.model(image_tensor)
         return features.detach().numpy(), prediction.detach()
-
 
     def evaluate_model(self, dataloader = None):
         '''
@@ -108,7 +103,6 @@ class ImageModel:
             y_true, y_pred = self._evaluate(inference_model, self.image_module.test_dataloader())
         return y_true, y_pred
 
-
     def load_ckpt_model_file(self, name):
         """
         Load the model named 'name' from the MODEL_CKPT_PATH folder (ie : model/resnet50)
@@ -118,7 +112,6 @@ class ImageModel:
         self.model = self.model.load_from_checkpoint(self.MODEL_CKPT_PATH / name)
         self.model.freeze()
         return self.model
-
 
     ##### Private methods #####
 
@@ -173,7 +166,6 @@ class ImageModel:
         #                                            "mean_accuracy": "ptl/val_accuracy"}, on="validation_end")
         return checkpoint_callback, early_stop_callback
 
-
     def _evaluate(self, model, loader):
         y_true = []
         y_pred = []
@@ -182,7 +174,6 @@ class ImageModel:
             y_true.extend(labels)
             y_pred.extend(prediction.detach().numpy())
         return np.array(y_true), np.array(y_pred)
-
 
     @torch.no_grad()
     def _inference_model(self):
