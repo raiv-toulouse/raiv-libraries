@@ -73,7 +73,7 @@ class ImageTools:
     def ros_msg_to_pil(msg):
         """ Recover the image in the msg sensor_msgs.Image message and convert it to a PILImage"""
         size = (msg.width, msg.height)  # Image size
-        if msg.encoding == '8UC3':
+        if msg.encoding == '8UC3' or msg.encoding == 'rgb8':
             img = Image.frombytes('RGB', size, msg.data)  # sensor_msg Image to PILImage
         elif msg.encoding == '16UC1':  # Typically : depth image
             img = Image.frombytes('I;16', size, msg.data)
