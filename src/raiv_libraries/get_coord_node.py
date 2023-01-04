@@ -218,6 +218,7 @@ class InBoxCoord:
             x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, color=False)
         elif req.mode == 'fixed':
             x_pixel, y_pixel = req.x, req.y
+            self.refresh_rgb_and_depth_images()
         elif req.mode == 'random_no_refresh':
             x_pixel, y_pixel = self.generate_random_pick_or_place_points(req.type_of_point, req.on_object, refresh=False, swap=False, color=False)
         elif req.mode == 'random_no_swap':
