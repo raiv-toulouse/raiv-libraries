@@ -3,6 +3,7 @@ from torchvision.transforms.functional import crop
 import cv2
 import numpy as np
 from PIL import Image
+from PIL.ImageQt import ImageQt
 import matplotlib.pyplot as plt
 import matplotlib
 import torchvision.transforms.functional as F
@@ -93,6 +94,11 @@ class ImageTools:
     @staticmethod
     def tensor_to_pil(tensor_image):
         return F.to_pil_image(tensor_image)
+
+    @staticmethod
+    def ros_msg_to_QImage(msg):
+        pil_img = ImageTools.ros_msg_to_pil(msg)
+        return ImageQt(pil_img)
 
     @staticmethod
     def show_image(imgs, files=None, title='Images', inv_needed=True):
