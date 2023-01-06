@@ -1,7 +1,8 @@
 
 from raiv_libraries.image_model import ImageModel
+from raiv_libraries.rgb_cnn import RgbCnn
 import torch
-import ntpath
+import os.path
 
 from raiv_libraries.image_tools import ImageTools
 
@@ -10,9 +11,11 @@ class PredictTools:
 
     @staticmethod
     def load_model(model_path):
-        ckpt_model_name = ntpath.basename(model_path)
-        dir_name = ntpath.dirname(model_path)
-        image_model = ImageModel(model_name='resnet18', ckpt_dir=dir_name)
+        ckpt_model_name = os.path.basename(model_path)
+        dir_name = os.path.dirname(model_path)
+        model_name = 'resnet18'
+        model = RgbCnn(backbone=model_name, courbe_folder=None)
+        image_model = ImageModel(model_name='resnet18', ckpt_dir=dir_name, data_module=None, model=model)
         inference_model = image_model.load_ckpt_model_file(ckpt_model_name)
         inference_model.freeze()
         return image_model, inference_model
