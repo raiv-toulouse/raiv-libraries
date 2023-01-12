@@ -163,8 +163,7 @@ class InBoxCoord:
         histogram = cv2.calcHist([self.depth_cv], [0], None, [dist_max], [1, dist_max])
         distance_camera_to_table = histogram.argmax()
         image_depth_without_table = np.where(self.depth_cv <= distance_camera_to_table - InBoxCoord.THRESHOLD_ABOVE_TABLE, self.depth_cv, 0)
-        box = self.rightbox if PICK_BOX_IS_RIGHT else self.leftbox
-        return PickingBoxIsEmptyResponse(self.is_box_empty(box, image_depth_without_table))
+        return PickingBoxIsEmptyResponse(self.is_box_empty(self.pick_box, image_depth_without_table))
 
     # Test if this box is empty
     def is_box_empty(self, box, image):
