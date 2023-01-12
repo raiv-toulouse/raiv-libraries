@@ -9,7 +9,6 @@ if __name__ == '__main__':
     from raiv_libraries.rgb_and_depth_cnn import RgbAndDepthCnn
     from raiv_libraries.image_data_module import ImageDataModule, RgbAndDepthSubset
     from raiv_libraries.rgb_and_depth_image_dataset import RgbAndDepthImageDataset
-    from raiv_libraries.image_model import ImageModel
     import argparse
     import time
 
@@ -29,10 +28,12 @@ if __name__ == '__main__':
     # Build the dataset and the DataModule
     dataset = RgbAndDepthImageDataset(args.images_rgb_folder, args.images_depth_folder)
     data_module = ImageDataModule(dataset, RgbAndDepthSubset, dataset_size=args.dataset_size)
-    # Now, we can build he ImageModel
-    rgb_and_depth_image_model = ImageModel(model=model, data_module=data_module, model_name=model_name, ckpt_dir=args.ckpt_folder, num_epochs=args.epochs, suffix=args.suffix_name)
-    start = time.time()
-    rgb_and_depth_image_model.call_trainer()  # Train model
-    end = time.time()
-    print(f"Elapsed time = {end-start:.2f} seconds")
+    # Build the trainer
+    trainer = model.build_trainer(data_module=data_module, model_name=model_name, ckpt_dir=args.ckpt_folder, num_epochs=args.epochs, suffix=args.suffix_name, dataset_size=args.dataset_size)
+    # Now, we can train the model ################################################
+    start_fit = time.time()
+    trainer.fit(model=model, datamodule=data_module)
+    print(f"Training duration = {time.time() - start_fit:.2f} seconds")
+    # Test  ################################################
+    trainer.test(ckpt_path='best', datamodule=data_module)
     print('End of model training')

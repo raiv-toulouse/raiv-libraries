@@ -17,7 +17,7 @@ class ImageDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.dataset_size = dataset_size
-        self.classes = dataset.classes
+        #self.classes = dataset.classes
         if self.dataset_size is None:
             weight_samples = self._calculate_weights(dataset)
             # Select a subset of the images
@@ -83,12 +83,13 @@ class ImageDataModule(pl.LightningDataModule):
         nb_images = len(images)
         my_dpi = 96  # For my monitor (see https://www.infobyip.com/detectmonitordpi.php)
         fig = plt.figure(figsize=(nb_images * 256 / my_dpi, 256 / my_dpi), dpi=my_dpi)
+        classes = self._find_classes()
         for idx in np.arange(nb_images):
             ax = fig.add_subplot(1, nb_images, idx + 1, xticks=[], yticks=[])
             img = ImageTools.inv_trans(images[idx])
             npimg = img.cpu().numpy()
             plt.imshow(np.transpose(npimg, (1, 2, 0)))
-            ax.set_title(self.classes[labels[idx]])
+            ax.set_title(classes[labels[idx]])
         return fig
 
 
