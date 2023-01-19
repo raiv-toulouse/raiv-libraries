@@ -1,16 +1,25 @@
 import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
+import torchvision
 from torch.optim import lr_scheduler
 from torchmetrics.functional import accuracy, confusion_matrix, f1_score
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from raiv_libraries.image_tools import ImageTools
+from pytorch_lightning.loggers import TensorBoardLogger
+import matplotlib.pyplot as plt
+import numpy as np
+from pathlib import Path
+import datetime
+
+plt.switch_backend('Qt5Agg')
+torch.set_printoptions(linewidth=120)
 
 
 # --- PYTORCH LIGHTNING MODULE ----
 class Cnn(pl.LightningModule):
 
-    def __init__(self,
-                 courbe_folder=None,
+    def __init__(self,  courbe_folder=None,
                  learning_rate: float = 1e-3,
                  batch_size: int = 8,
                  input_shape: list = [3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN],
@@ -22,9 +31,41 @@ class Cnn(pl.LightningModule):
         self.save_hyperparameters()
         self.build_model()
         if courbe_folder is not None:
-            self.train_file = open(courbe_folder + '/train/data_model_train1.txt',
-                           'w')  # fichier texte où sont stockées les données des graph (loss, accuracy etc...)
+            self.train_file = open(courbe_folder + '/train/data_model_train1.txt', 'w')  # fichier texte où sont stockées les données des graph (loss, accuracy etc...)
             self.val_file = open(courbe_folder + '/val/data_model_val1.txt', 'w')
+
+    def build_trainer(self, data_module, model_name, ckpt_dir, num_epochs, suffix, dataset_size):
+        """
+        Build the Pytorch trainer and a Tensorflow Board
+        """
+        self.MODEL_CKPT_PATH = Path(ckpt_dir)
+        now = datetime.datetime.now()
+        filename = f'model_{now.year}_{now.month}_{now.day}-{now.hour}_{now.minute}'
+        if dataset_size is not None:
+            filename = filename + '-' + str(dataset_size) + '_images'
+        if suffix != '':
+            filename = filename + '_' + suffix
+        self.MODEL_CKPT = self.MODEL_CKPT_PATH / model_name / filename
+        # Samples required by the custom ImagePredictionLogger callback to log image predictions.
+        val_samples = next(iter(data_module.val_dataloader()))
+        # ImageTools.show_image(val_samples[0])  # ImageTools.show_image(val_samples[0][0]) to show only the first image (not all images in the batch)
+        grid = ImageTools.inv_trans(torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2))
+        # Tensorboard Logger used
+        logger = TensorBoardLogger('runs', name=f'Model_{model_name}')
+        # write to tensorboard
+        logger.experiment.add_image('test', grid)
+        logger.finalize("success")
+        # Load callbacks ########################################
+        checkpoint_callback, early_stop_callback = self._config_callbacks()
+        # Trainer  ################################################
+        return pl.Trainer(max_epochs=num_epochs,
+                             devices="auto", accelerator="auto",
+                             auto_select_gpus=False,
+                             auto_lr_find=True,
+                             logger=logger,
+                             log_every_n_steps=10,
+                             # callbacks=[early_stop_callback, checkpoint_callback])
+                             callbacks=[checkpoint_callback])
 
     # training loop
     def training_step(self, batch, batch_idx):
@@ -88,6 +129,27 @@ class Cnn(pl.LightningModule):
         loss = F.cross_entropy(logits, labels, weight=weights, reduction='mean')
         return loss
 
+
+    def _config_callbacks(self):
+        # Checkpoint  ################################################
+        # Saves the models so it is possible to access afterwards
+        checkpoint_callback = ModelCheckpoint(dirpath=str(self.MODEL_CKPT_PATH),
+                                              filename=str(self.MODEL_CKPT),
+                                              monitor='val_loss',
+                                              save_top_k=1,
+                                              mode='min',
+                                              save_weights_only=True)
+        # EarlyStopping  ################################################
+        # Monitor a validation metric and stop training when it stops improving.
+        early_stop_callback = EarlyStopping(monitor='val_loss',
+                                            min_delta=0.0,
+                                            patience=5,
+                                            verbose=False,
+                                            mode='min')
+        # tune_report_callback = TuneReportCallback({"loss": "ptl/val_loss",
+        #                                            "mean_accuracy": "ptl/val_accuracy"}, on="validation_end")
+        return checkpoint_callback, early_stop_callback
+
     # TODO: Refactor internal metrics
     def _calculate_step_metrics(self, logits, y):
         # prepare the metrics
@@ -136,3 +198,55 @@ class Cnn(pl.LightningModule):
                                           f1score,
                                           self.current_epoch)
         return loss_mean
+
+
+    def _plot_classes_preds(self, images, labels):
+        '''
+        Generates matplotlib Figure using a trained network, along with images
+        and labels from a batch, that shows the network's top prediction along
+        with its probability, alongside the actual label, coloring this
+        information based on whether the prediction was correct or not.
+        Uses the "images_to_probs" function.
+        '''
+        preds, probs = self._images_to_probs(images)
+        # plot the images in the batch, along with predicted and true labels
+        my_dpi = 96 # For my monitor (see https://www.infobyip.com/detectmonitordpi.php)
+        nb_images = len(images)
+        fig = plt.figure(figsize=(nb_images * ImageTools.IMAGE_SIZE_FOR_NN/my_dpi, ImageTools.IMAGE_SIZE_FOR_NN/my_dpi), dpi=my_dpi)
+        class_names = self.image_module._find_classes()
+        for idx in np.arange(nb_images):
+            ax = fig.add_subplot(1, nb_images, idx + 1, xticks=[], yticks=[])
+            img = ImageTools.inv_trans(images[idx])
+            npimg = img.cpu().numpy()
+            plt.imshow(np.transpose(npimg, (1, 2, 0)))
+            ax.set_title("{0}, {1:.1f}%\n(label: {2})".format(
+                class_names[preds[idx]],
+                probs[idx] * 100.0,
+                class_names[labels[idx]]),
+                color=("green" if preds[idx] == labels[idx].item() else "red"))
+        return fig
+
+
+    def _images_to_probs(self, images):
+        '''
+        Generates predictions and corresponding probabilities from a trained
+        network and a list of images
+        '''
+        output = self.model(images)
+        # convert output probabilities to predicted class
+        _, preds_tensor = torch.max(output[1], 1)
+        # preds = np.squeeze(preds_tensor.cpu().numpy())  CAusait une erreur quand il n'y avait qu'une seule image
+        preds = preds_tensor.cpu().numpy()
+        return preds, [F.softmax(el, dim=0)[i].item() for i, el in zip(preds, output[1])]
+
+    # Static methods
+
+    @staticmethod
+    def compute_prob_and_class(pred):
+        """ Retrieve class (success or fail) and its associated percentage [0,1] from pred """
+        prob, cl = torch.max(pred, 1)
+        if cl.item() == 0:  # Fail
+            prob = 1 - prob.item()
+        else:  # Success
+            prob = prob.item()
+        return prob, cl

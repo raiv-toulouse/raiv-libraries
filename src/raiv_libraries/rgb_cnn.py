@@ -3,6 +3,8 @@ import torch.nn.functional as F
 import torchvision.models as models
 from raiv_libraries.cnn import Cnn
 
+from raiv_libraries.image_tools import ImageTools
+
 
 class RgbCnn(Cnn):
 
@@ -38,6 +40,25 @@ class RgbCnn(Cnn):
         return features, t
 
     def get_logits_and_outputs(self, batch):
-        x, y = batch
-        logits = self(x)
+        rgb, y = batch
+        logits = self(rgb)
         return logits, y
+
+    @staticmethod
+    @torch.no_grad()
+    def predict_from_pil_rgb_image(model, pil_rgb_img):
+        image_tensor = ImageTools.image_preprocessing(pil_rgb_img)
+        features, prediction = model(image_tensor)
+        prediction = prediction.detach()
+        return torch.exp(prediction)
+
+    @staticmethod
+    def load_ckpt_model_file(ckpt_model_filename):
+        """
+        Load the model named 'ckpt_model_filename' and freeze it
+        :param name: name of the model
+        :return: the model freezed to be used for inference
+        """
+        model = RgbCnn.load_from_checkpoint(ckpt_model_filename)
+        model.freeze()
+        return model
