@@ -12,16 +12,17 @@ from raiv_camera_calibration.perspective_calibration import PerspectiveCalibrati
 from raiv_libraries.image_tools import ImageTools
 import math
 import random
-import sys
 from PIL import Image as PILImage
 
 
-BOX_ELEVATION = 40  # 23   height in mm above the table for the bottom of a box
+BOX_ELEVATION = 30  # 23   height in mm above the table for the bottom of a box
 OBJECTS_HEIGHT = 18
 OBJECTS_HEAP = 100 # height of the heap of objects in a box
 THRESHOLD_EMPTY_BOX = 50 # A box is empty if the maximum number of pixels < this value
 PICK_BOX_IS_LEFT = 1
 PICK_BOX_IS_RIGHT = 2
+KERNEL_SIZE_FOR_BOX_EXTRACTION = 40
+DEBUG = False
 
 
 class InBoxCoord:
@@ -32,6 +33,7 @@ class InBoxCoord:
     # Used to specify if we want a point on an object or just a point in the box (but not necessary on an object)
     ON_OBJECT = True
     IN_THE_BOX = False
+
 
     def __init__(self, perspective_calibration):
 
@@ -135,11 +137,12 @@ class InBoxCoord:
         cx = int(moments['m10']/moments['m00'])
         cy = int(moments['m01']/moments['m00'])
         self.pick_box_centroid = (cx, cy)
-        # if DEBUG:
-        #     cv2.drawContours(imagergb, [self.leftbox], 0, (0, 255, 0), 3)
-        #     cv2.drawContours(imagergb, [self.rightbox], 0, (255, 0, 0), 3)
-        #     cv2.imshow('debug', imagergb)
-        #     cv2.waitKey(0)
+        if DEBUG:
+            cv2.drawContours(imagergb, [self.leftbox], 0, (0, 255, 0), 3)
+            cv2.drawContours(imagergb, [self.rightbox], 0, (255, 0, 0), 3)
+            # Visualize imagergb with debugger / view as image, cv2.imshow doesn't work
+            # cv2.imshow('debug', imagergb)
+            # cv2.waitKey(10)
 
 
     ###################################################################################################################
@@ -169,7 +172,9 @@ class InBoxCoord:
     def is_box_empty(self, box, image):
         mask = np.zeros((self.image_height, self.image_width, 1), np.uint8)
         cv2.drawContours(mask, [box], 0, 255, -1)
-        element = cv2.getStructuringElement(0, (2 * 20 + 1, 2 * 20 + 1), (20, 20))
+        #element = cv2.getStructuringElement(0, (2 * 20 + 1, 2 * 20 + 1), (20, 20))
+        kernel = (2 * KERNEL_SIZE_FOR_BOX_EXTRACTION + 1, 2 * KERNEL_SIZE_FOR_BOX_EXTRACTION + 1)
+        element = cv2.getStructuringElement(cv2.MORPH_RECT, kernel)
         mask = cv2.erode(mask, element)
 
         masked_image = cv2.bitwise_and(image, image, mask=mask)
