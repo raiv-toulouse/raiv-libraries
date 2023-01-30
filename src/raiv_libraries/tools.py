@@ -7,7 +7,7 @@ from raiv_libraries.image_tools import ImageTools
 from raiv_libraries.robotUR import RobotUR
 import geometry_msgs.msg as geometry_msgs
 
-
+# Ajout pour un test
 #TODO : Move in a constant file
 #
 THRESHOLD_ABOVE_TABLE = 10  # Used to select all the pixels above the table
