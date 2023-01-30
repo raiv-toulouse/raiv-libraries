@@ -9,7 +9,7 @@ import geometry_msgs.msg as geometry_msgs
 
 # Ajout pour un test
 #TODO : Move in a constant file
-#
+# Un autre ajout maintenant
 THRESHOLD_ABOVE_TABLE = 10  # Used to select all the pixels above the table
 BIG_CROP_WIDTH = 100  # Crop a big image to be able to perform rotations before final small crop
 BIG_CROP_HEIGHT = 100
