@@ -8,7 +8,7 @@ from raiv_libraries.robotUR import RobotUR
 import geometry_msgs.msg as geometry_msgs
 
 # Test depuis koala
-# et depuis DL
+# et depuis DL v2
 #TODO : Move in a constant file
 THRESHOLD_ABOVE_TABLE = 10  # Used to select all the pixels above the table
 BIG_CROP_WIDTH = 100  # Crop a big image to be able to perform rotations before final small crop
