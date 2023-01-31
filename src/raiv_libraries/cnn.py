@@ -7,6 +7,7 @@ from torchmetrics.functional import accuracy, confusion_matrix, f1_score
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from raiv_libraries.image_tools import ImageTools
 from pytorch_lightning.loggers import TensorBoardLogger
+from ray.tune.integration.pytorch_lightning import TuneReportCallback
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
@@ -19,7 +20,7 @@ torch.set_printoptions(linewidth=120)
 # --- PYTORCH LIGHTNING MODULE ----
 class Cnn(pl.LightningModule):
 
-    def __init__(self,  courbe_folder=None,
+    def __init__(self,  config, courbe_folder=None,
                  learning_rate: float = 1e-3,
                  batch_size: int = 8,
                  input_shape: list = [3, ImageTools.IMAGE_SIZE_FOR_NN, ImageTools.IMAGE_SIZE_FOR_NN],
@@ -58,6 +59,7 @@ class Cnn(pl.LightningModule):
         # Load callbacks ########################################
         checkpoint_callback, early_stop_callback = self._config_callbacks()
         # Trainer  ################################################
+        metrics = {"loss": "ptl/val_loss", "acc": "ptl/val_accuracy"}
         return pl.Trainer(max_epochs=num_epochs,
                              devices="auto", accelerator="auto",
                              auto_select_gpus=False,
@@ -65,7 +67,7 @@ class Cnn(pl.LightningModule):
                              logger=logger,
                              log_every_n_steps=10,
                              # callbacks=[early_stop_callback, checkpoint_callback])
-                             callbacks=[checkpoint_callback])
+                             callbacks=[checkpoint_callback, TuneReportCallback(metrics, on="validation_end")])
 
     # training loop
     def training_step(self, batch, batch_idx):
@@ -74,7 +76,7 @@ class Cnn(pl.LightningModule):
 
     def training_epoch_end(self, outputs):
         """Compute and log training loss and accuracy at the epoch level."""
-        loss_mean = self._calculate_epoch_metrics(outputs, name='Train')
+        loss_mean, acc_mean = self._calculate_epoch_metrics(outputs, name='Train')
         self.log(f"\nEpoch {self.current_epoch} : training_epoch_end : loss_mean = ", loss_mean.item())
 
     # validation loop
@@ -87,8 +89,10 @@ class Cnn(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         """Compute and log validation loss and accuracy at the epoch level."""
-        loss_mean = self._calculate_epoch_metrics(outputs, name='Val')
+        loss_mean, acc_mean = self._calculate_epoch_metrics(outputs, name='Val')
         self.log("==> validation_epoch_end : loss_mean = ", loss_mean.item())
+        self.log("ptl/val_loss", loss_mean)
+        self.log("ptl/val_accuracy", acc_mean)
 
     # test loop
     def test_step(self, batch, batch_idx):
@@ -97,12 +101,12 @@ class Cnn(pl.LightningModule):
         return self._calculate_step_metrics(logits, y)
 
     def test_epoch_end(self, outputs):
-        loss_mean = self._calculate_epoch_metrics(outputs, name='Test')
+        loss_mean, acc_mean = self._calculate_epoch_metrics(outputs, name='Test')
         self.log("test_epoch_end : loss_mean = ", loss_mean.item())
 
     # define optimizers
     def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.learning_rate, momentum=0.9)
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.config['learning_rate'], momentum=0.9)
         # Decay LR by a factor of 0.1 every 7 epochs
         scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
         return (
@@ -172,20 +176,18 @@ class Cnn(pl.LightningModule):
                                  for output in outputs]).mean()
         acc_mean = torch.stack([output['num_correct']
                                 for output in outputs]).sum().float()
-        acc_mean /= (len(outputs) * self.hparams.batch_size)
+        acc_mean /= (len(outputs) * self.hparams.config['batch_size'])
         f1score = torch.stack([output['f1_score']
                                 for output in outputs]).mean()
         #Text writing
         if self.hparams.courbe_folder:
+            txt = '\n' + str(self.current_epoch)
+            txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
             if name == 'Train' :
-                txt = '\n' + str(self.current_epoch)
                 self.train_file.write(txt)
-                txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
                 self.train_file.write(txt2)
             if name == 'Val' :
-                txt = '\n' + str(self.current_epoch)
                 self.val_file.write(txt)
-                txt2 = ';' + str(loss_mean.item()) + ';' + str(acc_mean.item()) + ';' + str(f1score.item())
                 self.val_file.write(txt2)
         # Logging scalars
         self.logger.experiment.add_scalar(f'Loss/{name}',
@@ -197,7 +199,7 @@ class Cnn(pl.LightningModule):
         self.logger.experiment.add_scalar(f'F1_Score/{name}',
                                           f1score,
                                           self.current_epoch)
-        return loss_mean
+        return loss_mean, acc_mean
 
 
     def _plot_classes_preds(self, images, labels):
