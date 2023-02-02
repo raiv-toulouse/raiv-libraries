@@ -7,8 +7,8 @@ from raiv_libraries.image_tools import ImageTools
 
 
 class RgbAndDepthCnn(Cnn):
-    def __init__(self, **kwargs):
-        super(RgbAndDepthCnn, self).__init__(**kwargs)
+    def __init__(self, config, **kwargs):
+        super(RgbAndDepthCnn, self).__init__(config, **kwargs)
 
     def build_model(self):
         """Define model layers """
@@ -21,9 +21,12 @@ class RgbAndDepthCnn(Cnn):
         num_target_classes = 2
         n_sizes = self.get_cumulative_output_conv_layers_size([self.feature_extractor_rgb, self.feature_extractor_depth])
         # Classifier
-        _fc_layers = [torch.nn.Linear(n_sizes, 256),
-                      torch.nn.Linear(256, 32),
-                      torch.nn.Linear(32, num_target_classes)]
+        layer_1_size = self.hparams.config['layer_1_size']
+        layer_2_size = self.hparams.config['layer_2_size']
+        _fc_layers = [torch.nn.Linear(n_sizes, layer_1_size),
+                      torch.nn.Linear(layer_1_size, layer_2_size),
+                      torch.nn.Linear(layer_2_size, num_target_classes)]
+
         self.fc = torch.nn.Sequential(*_fc_layers)
 
     def _build_features_layers(self, model_func):
