@@ -59,7 +59,6 @@ def tune_cnn(num_samples=10, num_epochs=10, gpus_per_trial=0):
         param_space=config,
     )
     results = tuner.fit()
-
     print("Best hyperparameters found were: ", results.get_best_result().config)
 
 

@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
+import torchmetrics
 import torchvision
 from torch.optim import lr_scheduler
 from torchmetrics.functional import accuracy, confusion_matrix, f1_score
@@ -12,6 +13,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 import datetime
+import io
+import seaborn as sn
+import pandas as pd
+from PIL import Image
 
 plt.switch_backend('Qt5Agg')
 torch.set_printoptions(linewidth=120)
@@ -47,15 +52,15 @@ class Cnn(pl.LightningModule):
         if suffix != '':
             filename = filename + '_' + suffix
         self.MODEL_CKPT = self.MODEL_CKPT_PATH / model_name / filename
-        # Samples required by the custom ImagePredictionLogger callback to log image predictions.
-        val_samples = next(iter(data_module.val_dataloader()))
-        # ImageTools.show_image(val_samples[0])  # ImageTools.show_image(val_samples[0][0]) to show only the first image (not all images in the batch)
-        grid = ImageTools.inv_trans(torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2))
         # Tensorboard Logger used
         logger = TensorBoardLogger('runs', name=f'Model_{model_name}')
-        # write to tensorboard
-        logger.experiment.add_image('test', grid)
-        logger.finalize("success")
+        # # Samples required by the custom ImagePredictionLogger callback to log image predictions.
+        # val_samples = next(iter(data_module.val_dataloader()))
+        # # ImageTools.show_image(val_samples[0])  # ImageTools.show_image(val_samples[0][0]) to show only the first image (not all images in the batch)
+        # grid = ImageTools.inv_trans(torchvision.utils.make_grid(val_samples[0], nrow=8, padding=2))
+        # # write to tensorboard
+        # logger.experiment.add_image('test', grid)
+        # logger.finalize("success")
         # Load callbacks ########################################
         checkpoint_callback, early_stop_callback = self._config_callbacks()
         # Trainer  ################################################
@@ -77,22 +82,46 @@ class Cnn(pl.LightningModule):
     def training_epoch_end(self, outputs):
         """Compute and log training loss and accuracy at the epoch level."""
         loss_mean, acc_mean = self._calculate_epoch_metrics(outputs, name='Train')
-        self.log(f"\nEpoch {self.current_epoch} : training_epoch_end : loss_mean = ", loss_mean.item())
 
     # validation loop
     def validation_step(self, batch, batch_idx):
         logits, y = self.get_logits_and_outputs(batch)
         # Compute loss & metrics:
         outputs = self._calculate_step_metrics(logits, y)
+        outputs["pred_out"]=logits[1]  # Predicted outputs
+        outputs["true_out"]=y  # Real outputs
         self.log("val_loss", outputs["loss"])
         return outputs
 
     def validation_epoch_end(self, outputs):
         """Compute and log validation loss and accuracy at the epoch level."""
         loss_mean, acc_mean = self._calculate_epoch_metrics(outputs, name='Val')
-        self.log("==> validation_epoch_end : loss_mean = ", loss_mean.item())
         self.log("ptl/val_loss", loss_mean)
         self.log("ptl/val_accuracy", acc_mean)
+        # Generate a convolution matrix for TensorBoard
+        tb = self.logger.experiment  # noqa
+        pred_out = torch.cat([tmp['pred_out'] for tmp in outputs])
+        true_out = torch.cat([tmp['true_out'] for tmp in outputs])
+        confusion = torchmetrics.ConfusionMatrix(num_classes=2).to(out.get_device())
+        confusion(pred_out, true_out)
+        computed_confusion = confusion.compute().detach().cpu().numpy().astype(int)
+        # confusion matrix
+        df_cm = pd.DataFrame(
+            computed_confusion,
+            ['fail', 'success'],  # Lines
+            ['fail', 'success'],  # Columns
+        )
+        fig, ax = plt.subplots(figsize=(10, 5))
+        fig.subplots_adjust(left=0.05, right=.65)
+        sn.set(font_scale=1.2)
+        sn.heatmap(df_cm, annot=True, annot_kws={"size": 16}, fmt='d', ax=ax)
+        buf = io.BytesIO()
+        plt.savefig(buf, format='jpeg', bbox_inches='tight')
+        buf.seek(0)
+        im = Image.open(buf)
+        im = torchvision.transforms.ToTensor()(im)
+        tb.add_image("val_confusion_matrix", im, global_step=self.current_epoch)
+
 
     # test loop
     def test_step(self, batch, batch_idx):
@@ -102,7 +131,6 @@ class Cnn(pl.LightningModule):
 
     def test_epoch_end(self, outputs):
         loss_mean, acc_mean = self._calculate_epoch_metrics(outputs, name='Test')
-        self.log("test_epoch_end : loss_mean = ", loss_mean.item())
 
     # define optimizers
     def configure_optimizers(self):
@@ -127,8 +155,7 @@ class Cnn(pl.LightningModule):
         return size
 
     # loss function, weights modified to give more importance to class 1
-    @staticmethod
-    def _loss_function(logits, labels):
+    def _loss_function(self, logits, labels):
         weights = torch.tensor([7.0, 3.0]).to(logits.device)#.cuda()
         loss = F.cross_entropy(logits, labels, weight=weights, reduction='mean')
         return loss
@@ -163,20 +190,19 @@ class Cnn(pl.LightningModule):
         num_correct = torch.eq(preds.view(-1), y.view(-1)).sum()
         acc = accuracy(preds, y)
         f1score = f1_score(preds, y, num_classes=2, average='weighted')
-        cm = confusion_matrix(preds, y, num_classes=2, )
         return {'loss': loss,
                 'acc': acc,
                 'f1_score': f1score,
-                'confusion_matrix': cm,
-                'num_correct': num_correct}
+                'num_correct': num_correct,
+                'total': len(preds)}
 
     def _calculate_epoch_metrics(self, outputs, name):
         # Logging activations
         loss_mean = torch.stack([output['loss']
                                  for output in outputs]).mean()
-        acc_mean = torch.stack([output['num_correct']
-                                for output in outputs]).sum().float()
-        acc_mean /= (len(outputs) * self.hparams.config['batch_size'])
+        correct = sum([x['num_correct'] for x in outputs])
+        total = sum([x['total'] for x in outputs])
+        acc_mean = correct / total
         f1score = torch.stack([output['f1_score']
                                 for output in outputs]).mean()
         #Text writing
