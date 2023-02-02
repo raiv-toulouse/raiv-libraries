@@ -21,6 +21,9 @@ def create_rgb_depth_folders(parent_folder):
     rgb / success; rgb / fail; depth / success; depth / fail
     """
     for rd_folder in ['rgb', 'depth']:
+        folder = parent_folder / rd_folder
+        Path.mkdir(folder, parents=True, exist_ok=True)
+        folder.chmod(0o777)  # Write permission for everybody
         for sf_folder in ['success', 'fail']:
             folder = parent_folder / rd_folder / sf_folder
             Path.mkdir(folder, parents=True, exist_ok=True)
@@ -40,7 +43,6 @@ def save_pil_images(parent_folder, success_or_fail, rgb_images_pil, depth_images
             image_path.chmod(0o777) # Write permission for everybody
 
 def generate_and_save_rgb_depth_images(resp_pick, parent_image_folder, is_object_gripped):
-
     rgb_images_pil = []
     depth_images_pil = []
     pil_rgb = ImageTools.ros_msg_to_pil(resp_pick.rgb_crop)
@@ -62,11 +64,14 @@ def generate_and_save_rgb_depth_images(resp_pick, parent_image_folder, is_object
     pil_depth = ImageTools.numpy_to_pil(image_depth_without_table)
 
     # Generate a set of images with rotation transform
+    nb_images = 0
     for deg in range(0, 360, 10):
         rgb_images_pil.append(ImageTools.center_crop(pil_rgb.rotate(deg), ImageTools.CROP_WIDTH, ImageTools.CROP_HEIGHT))
         depth_images_pil.append(ImageTools.center_crop(pil_depth.rotate(deg), ImageTools.CROP_WIDTH, ImageTools.CROP_HEIGHT))
+        nb_images+=1
 
     save_pil_images(parent_image_folder, 'success' if is_object_gripped else 'fail', rgb_images_pil, depth_images_pil) # Save images in success folders
+    return nb_images
 
 def xyz_to_pose(x, y, z):
     return geometry_msgs.Pose(geometry_msgs.Vector3(x, y, z), RobotUR.tool_down_pose)
