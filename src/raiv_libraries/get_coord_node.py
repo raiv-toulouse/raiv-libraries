@@ -172,17 +172,10 @@ class InBoxCoord:
         cv2.drawContours(mask, [box], 0, 255, -1)
         element = cv2.getStructuringElement(0, (2 * 20 + 1, 2 * 20 + 1), (20, 20))
         mask = cv2.erode(mask, element)
-
         masked_image = cv2.bitwise_and(image, image, mask=mask)
         dist_min = int(self.distance_camera_to_table - BOX_ELEVATION - OBJECTS_HEAP)
         dist_max = int(self.distance_camera_to_table - BOX_ELEVATION)
         hist = cv2.calcHist([masked_image], [0], mask, [OBJECTS_HEAP], [dist_min, dist_max])
-
-        # if DEBUG:
-        #     cv2.imshow('debug',  masked_image)
-        #     cv2.waitKey(0)
-        #     print('MAX = ', hist.max())
-
         return hist.max() < THRESHOLD_EMPTY_BOX
 
 
@@ -227,7 +220,6 @@ class InBoxCoord:
 
         depth = self.depth_cv
         x, y, z = self.perspective_calibration.from_2d_to_3d([x_pixel, y_pixel], depth)
-        print(x, y, z)
         if req.type_of_point == InBoxCoord.PICK:
             rgb_pil = ImageTools.numpy_to_pil(cv2.cvtColor(self.bgr_cv, cv2.COLOR_BGR2RGB))
             depth_pil = ImageTools.numpy_to_pil(self.depth_cv)
@@ -275,20 +267,13 @@ class InBoxCoord:
             y2 = int(y * math.cos(math.pi / 180 * beta) - x * math.sin(math.pi / 180 * beta))
             x2 = x2 + int(pt_ref[0])
             y2 = y2 + int(pt_ref[1])
-            print('profondeur du pixel----------------------', self.depth_cv[y2][x2])
-            #h_min = int(self.distance_camera_to_table - BOX_ELEVATION - OBJECTS_HEIGHT)
-            #h_max = int(self.distance_camera_to_table - BOX_ELEVATION - OBJECTS_HEAP)
-            #print('distance table =  ', self.distance_camera_to_table)
-            #print ('h_min = : ',h_min, 'h_max = : ', h_max)
             if on_object == InBoxCoord.IN_THE_BOX:
                 point_ok = True
             elif 405 < self.depth_cv[y2][x2] < 510:  # PICK case
                 point_ok = True
-
         if not self.depth_cv[y2][x2] in range(1, self.distance_camera_to_table - 3):
             rospy.loginfo(f'Generating another randpoint due to bad value of depth: {self.depth_cv[y2][x2]}')
             return self.generate_random_point_in_box(box, angle, point_type, on_object)
-
         return x2, y2
 
 
@@ -313,14 +298,12 @@ class InBoxCoord:
             self.refresh_rgb_and_depth_images()
         if swap == True :
             self.swap_pick_and_place_boxes_if_needed(self.depth_cv)
-
         if color==False and point_type == InBoxCoord.PICK:
             return self.generate_random_point_in_box(self.pick_box, self.pick_box_angle, point_type, on_object)
         if color==False and point_type == InBoxCoord.PLACE:
             return self.generate_random_point_in_box(self.place_box, self.place_box_angle, point_type, on_object)
-
         if color==True and point_type == InBoxCoord.PICK:
-            print("zzzzeeeeebbbbiii")
+            print("generate_random_pick_or_place_points : color==True and point_type == InBoxCoord.PICK")
             return self.generate_random_point_in_box_color(self.pick_box, self.pick_box_angle, point_type, on_object)
 
     def generate_random_point_in_box_color(self, box, angle, point_type, on_object):
@@ -346,8 +329,6 @@ class InBoxCoord:
             y2 = int(y * math.cos(math.pi / 180 * beta) - x * math.sin(math.pi / 180 * beta))
             x2 = x2 + int(pt_ref[0])
             y2 = y2 + int(pt_ref[1])
-
-
             image_rgb = cv2.cvtColor(self.bgr_cv, cv2.COLOR_BGR2RGB)
             image_pil = ImageTools.numpy_to_pil(image_rgb)
             image_pil.save("/common/work/stockage_image_test/test.png")
@@ -356,17 +337,13 @@ class InBoxCoord:
             print("*******************************************")
             i = PILImage.open("/common/work/stockage_image_test/test.png")
             (rouge, vert, bleu) = i.getpixel((x2, y2))
-            print(rouge, vert, bleu)
-            #print('profondeur du pixel----------------------', self.image_depth[y2][x2])
             if on_object == InBoxCoord.IN_THE_BOX:
                 point_ok = True
             elif rouge < 15 and vert > 25 and bleu < 40:
                 point_ok = True
-
         if not self.depth_cv[y2][x2] in range(1, self.distance_camera_to_table - 3):
             rospy.loginfo(f'Generating another randpoint due to bad value of depth: {self.depth_cv[y2][x2]}')
             return self.generate_random_point_in_box_color(box, angle, point_type, on_object)
-
         return x2, y2
 
 
