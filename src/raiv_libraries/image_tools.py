@@ -62,9 +62,9 @@ class ImageTools:
         return image
 
     @staticmethod
-    def crop_xy(image, x, y, crop_width, crop_height):
-        """ Crop image PIL at position (predict_center_x,predict_center_y) and with size (WIDTH,HEIGHT) """
-        return crop(image, y - crop_height/2, x - crop_width/2, crop_height, crop_width)  # top, left, height, width
+    def crop_xy(image, x_center, y_center, crop_width, crop_height):
+        """ Crop image PIL at position (x_center, y_center) and with size (WIDTH,HEIGHT) """
+        return crop(image, y_center - crop_height/2, x_center - crop_width/2, crop_height, crop_width)  # top, left, height, width
 
     @staticmethod
     def center_crop(image, crop_width, crop_height):
