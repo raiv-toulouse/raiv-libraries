@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import torchvision.transforms.functional as F
 import torch
-
+from PyQt5.QtGui import *
 
 
 class ImageTools:
@@ -105,6 +105,10 @@ class ImageTools:
     def ros_msg_to_QImage(msg):
         pil_img = ImageTools.ros_msg_to_pil(msg)
         return ImageQt(pil_img)
+
+    @staticmethod
+    def pil_to_QImage(img_pil):
+        return QImage(img_pil.tobytes("raw", "RGB"), img_pil.width, img_pil.height, QImage.Format_RGB888)
 
     @staticmethod
     def show_image(imgs, files=None, title='Images', inv_needed=True):
