@@ -102,7 +102,7 @@ class Cnn(pl.LightningModule):
         tb = self.logger.experiment  # noqa
         pred_out = torch.cat([tmp['pred_out'] for tmp in outputs])
         true_out = torch.cat([tmp['true_out'] for tmp in outputs])
-        confusion = torchmetrics.ConfusionMatrix(num_classes=2).to(out.get_device())
+        confusion = torchmetrics.ConfusionMatrix(num_classes=2).to(pred_out.get_device())
         confusion(pred_out, true_out)
         computed_confusion = confusion.compute().detach().cpu().numpy().astype(int)
         # confusion matrix
