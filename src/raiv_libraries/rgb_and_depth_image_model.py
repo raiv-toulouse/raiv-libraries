@@ -9,12 +9,12 @@ def train_cnn_tune(config, num_epochs=10):
     # Build the model
     # Build the model
     model_name = 'resnet18'
-    model = RgbAndDepthCnn(backbone=model_name, courbe_folder=args.courbe_path)
+    model = RgbAndDepthCnn(config, backbone=model_name, courbe_folder=args.courbe_path)
     # Build the dataset and the DataModule
-    dataset = RgbAndDepthImageDataset(args.images_rgb_folder, args.images_depth_folder)
+    dataset = RgbAndDepthImageDataset(args.images_rgb_and_depth_folder+'/rgb', args.images_rgb_and_depth_folder+'/depth')
     data_module = ImageDataModule(dataset, RgbAndDepthSubset, dataset_size=args.dataset_size, batch_size=config["batch_size"])
     # Build the trainer
-    trainer = model.build_trainer(data_module=data_module, model_name=model_name, ckpt_dir=args.ckpt_folder, num_epochs=args.epochs, suffix=args.suffix_name,
+    trainer = model.build_trainer(data_module=data_module, model_name=model_name, ckpt_dir=args.ckpt_folder, num_epochs=num_epochs, suffix=args.suffix_name,
                                   dataset_size=args.dataset_size)
     # Now, we can train the model ################################################
     trainer.fit(model=model, datamodule=data_module)
@@ -64,8 +64,7 @@ if __name__ == '__main__':
     import time
 
     parser = argparse.ArgumentParser(description='Train a Cnn with RGB and depth images from specified images folder. View results with : tensorboard --logdir=runs')
-    parser.add_argument('images_rgb_folder', type=str, help='RGB images folder with fail and success sub-folders')
-    parser.add_argument('images_depth_folder', type=str, help='Depth images folder with fail and success sub-folders')
+    parser.add_argument('images_rgb_and_depth_folder', type=str, help='RGB and DEPTH images folder with <rgb and depth> / <fail and success> sub-folders')
     parser.add_argument('ckpt_folder', type=str, help='folder path where to stock the model.CKPT file generated')
     parser.add_argument('-c', '--courbe_path', default=None, type=str, help='Optionnal path folder .txt where the informations of the model will be stocked for courbes_CNN.py')
     parser.add_argument('-s', '--suffix_name', default='', type=str, help='Optionnal suffix to add to the model name')
@@ -77,19 +76,19 @@ if __name__ == '__main__':
 
     if args.tune:
         print('Hyperparameter tuning.')
-        tune_cnn(num_samples=20, num_epochs=10, gpus_per_trial=0.25)
+        tune_cnn(num_samples=20, num_epochs=args.epochs, gpus_per_trial=0.25)
     else:
         config = {
             "layer_1_size": 256,
             "layer_2_size": 16,
-            "learning_rate": 0.01,
+            "learning_rate": 0.001,
             "batch_size": 8
         }
         # Build the model
         model_name = 'resnet18'
-        model = RgbAndDepthCnn(backbone=model_name, courbe_folder=args.courbe_path)
+        model = RgbAndDepthCnn(config, backbone=model_name, courbe_folder=args.courbe_path)
         # Build the dataset and the DataModule
-        dataset = RgbAndDepthImageDataset(args.images_rgb_folder, args.images_depth_folder)
+        dataset = RgbAndDepthImageDataset(args.images_rgb_and_depth_folder+'/rgb', args.images_rgb_and_depth_folder+'/depth')
         data_module = ImageDataModule(dataset, RgbAndDepthSubset, dataset_size=args.dataset_size, batch_size=config["batch_size"])
         # Build the trainer
         trainer = model.build_trainer(data_module=data_module, model_name=model_name, ckpt_dir=args.ckpt_folder, num_epochs=args.epochs, suffix=args.suffix_name, dataset_size=args.dataset_size)
