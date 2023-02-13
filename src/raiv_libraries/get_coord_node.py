@@ -281,22 +281,6 @@ class InBoxCoord:
             return self.generate_random_point_in_box(box, angle, point_type, on_object)
         return x2, y2
 
-
-    # Generate cropped images of rgb and depth around the selected point
-    def generate_cropped_images(self, x, y, image_rgb, image_depth, crop_width, crop_height):
-        rgb_crop = image_rgb[
-                        int(y - crop_width/2):int(y + crop_width/2),
-                        int(x - crop_height/2):int(x + crop_height/2)
-                        ]
-        depth_crop = image_depth[
-                          int(y - crop_width/2):int(y + crop_width/2),
-                          int(x - crop_height/2):int(x + crop_height/2)
-                          ]
-        depth_crop = np.where(depth_crop == 0, self.distance_camera_to_table, depth_crop)
-
-        return rgb_crop, depth_crop
-
-
     # Generate a cropped image which center is a random point in the pick or place box
     def generate_random_pick_or_place_points(self, point_type, on_object, refresh = True, swap = True, color=False):
         if refresh == True :
