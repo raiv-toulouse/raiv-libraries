@@ -83,6 +83,8 @@ class InBoxCoord:
             self.place_box = self.scale_contour(self.leftbox, 0.5)
             self.place_box_angle = self.angleleft
             self.picking_box = PICK_BOX_IS_RIGHT
+        elif vide_right and vide_left:
+            rospy.loginfo('Be sure to have one box with object')
         else:
             rospy.loginfo('Be sure to have one empty box')
 
