@@ -10,6 +10,7 @@ from raiv_libraries.srv import GetPickingBoxCentroid, GetPickingBoxCentroidRespo
 from raiv_libraries.srv import PickingBoxIsEmpty, PickingBoxIsEmptyResponse
 from raiv_camera_calibration.perspective_calibration import PerspectiveCalibration
 from raiv_libraries.image_tools import ImageTools
+from raiv_research.msg import RgbAndDepthImages
 import math
 import random
 from PIL import Image as PILImage
@@ -44,7 +45,7 @@ class InBoxCoord:
         rospy.Service('/In_box_coordService', get_coordservice, self.process_service)
         rospy.Service('/Is_Picking_Box_Empty', PickingBoxIsEmpty, self.is_picking_box_empty)
         rospy.Service('/Get_picking_box_centroid', GetPickingBoxCentroid, self._get_picking_box_centroid)
-
+        rospy.Subscriber('/new_images', RgbAndDepthImages, self._update_images)
 
     ###################################################################################################################
     # Initialisation methods
@@ -143,8 +144,9 @@ class InBoxCoord:
             cv2.drawContours(imagergb, [self.leftbox], 0, (0, 255, 0), 3)
             cv2.drawContours(imagergb, [self.rightbox], 0, (255, 0, 0), 3)
             # Visualize imagergb with debugger / view as image, cv2.imshow doesn't work
-            # cv2.imshow('debug', imagergb)
-            # cv2.waitKey(10)
+            cv2.imshow('debug', imagergb)
+            cv2.waitKey(3000)
+            cv2.destroyAllWindows()
 
 
     ###################################################################################################################
@@ -155,6 +157,10 @@ class InBoxCoord:
         return GetPickingBoxCentroidResponse(x_centroid=self.pick_box_centroid[0],
                                              y_centroid=self.pick_box_centroid[1],
                                              z_centroid=0)
+
+    def _update_images(self, msg):
+        self.bgr_cv = CvBridge().imgmsg_to_cv2(msg.rgb_image, desired_encoding='bgr8')
+        self.depth_cv = CvBridge().imgmsg_to_cv2(msg.depth_image, desired_encoding='16UC1')
 
     # Function to refresh the RGB and Depth image
     def refresh_rgb_and_depth_images(self):

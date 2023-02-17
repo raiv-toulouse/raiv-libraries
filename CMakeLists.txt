@@ -38,7 +38,6 @@ add_service_files(
    ObjectGripped.srv
    BoxIsEmpty.srv
    PickingBoxIsEmpty.srv
-   ClearPrediction.srv
    GetPickingBoxCentroid.srv
 )
 
